@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Bem Estar – Thamiris Barone</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#111210;--bg2:#1a1c19;--bg3:#222420;--bg4:#2a2d27;
+  --border:#333530;--border2:#3e4038;
+  --accent:#c8a882;--accent2:#a8845e;--accent-dim:rgba(200,168,130,.12);
+  --text:#e8e4dc;--text-soft:#9a9488;--text-muted:#5a5850;
+  --green:#6daa7a;--green-dim:rgba(109,170,122,.15);
+  --red:#c07070;--red-dim:rgba(192,112,112,.15);
+  --blue:#7a9abf;--blue-dim:rgba(122,154,191,.15);
+  --amber:#c8953a;--amber-dim:rgba(200,149,58,.15);
+  --shadow:0 2px 20px rgba(0,0,0,.4);
+  --r:16px;--r-sm:10px;
+  --font-d:'Cormorant Garamond',serif;--font-b:'DM Sans',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;width:100%;background:#0d0e0c;font-family:var(--font-b);color:var(--text);-webkit-font-smoothing:antialiased;}
+#app{max-width:430px;min-height:100dvh;margin:0 auto;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.8);}
+
+/* HEADER */
+.app-header{background:var(--bg2);padding:52px 22px 16px;border-bottom:1px solid var(--border);}
+.header-brand{display:flex;align-items:center;gap:12px;}
+.brand-logo{width:38px;height:38px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 12px rgba(200,168,130,.25);}
+.brand-text h1{font-family:var(--font-d);font-size:20px;font-weight:500;letter-spacing:.03em;}
+.brand-text p{font-size:10px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-top:1px;}
+.header-date{margin-top:12px;font-size:12px;color:var(--text-soft);}
+.header-date span{color:var(--accent);font-weight:500;}
+
+/* TABS */
+.nav-tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);}
+.nav-tab{flex:1;padding:13px 0;border:none;background:none;cursor:pointer;font-family:var(--font-b);font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:4px;transition:color .2s;position:relative;}
+.nav-tab .ti{font-size:16px;}
+.nav-tab.active{color:var(--accent);}
+.nav-tab.active::after{content:'';position:absolute;bottom:0;left:18%;right:18%;height:2px;background:var(--accent);border-radius:2px 2px 0 0;}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;padding:0 0 100px;}
+.page{display:none;}.page.active{display:block;}
+.content::-webkit-scrollbar{width:0;}
+
+/* SECTION HEADER */
+.sec-hdr{padding:20px 20px 14px;display:flex;align-items:center;justify-content:space-between;}
+.sec-title{font-family:var(--font-d);font-size:22px;font-weight:500;}
+.sec-sub{font-size:11px;color:var(--text-muted);font-weight:300;margin-top:2px;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border:none;border-radius:50px;cursor:pointer;font-family:var(--font-b);font-size:13px;font-weight:500;transition:all .18s;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#111;box-shadow:0 4px 16px rgba(200,168,130,.28);}
+.btn-primary:active{transform:scale(.97);}
+.btn-ghost{background:var(--bg3);color:var(--accent);border:1px solid var(--border2);}
+.btn-ghost:active{transform:scale(.97);}
+.btn-green{background:var(--green-dim);color:var(--green);font-size:12px;padding:7px 14px;}
+.btn-red{background:var(--red-dim);color:var(--red);font-size:12px;padding:7px 14px;}
+.btn-amber{background:var(--amber-dim);color:var(--amber);font-size:12px;padding:7px 14px;}
+.btn-wa{background:rgba(45,122,69,.18);color:#5cb87a;font-size:12px;padding:7px 14px;}
+.btn-sm{padding:7px 14px;font-size:12px;}
+.btn-icon{width:36px;height:36px;padding:0;justify-content:center;background:var(--bg3);color:var(--accent);border-radius:10px;border:1px solid var(--border2);}
+.btn-add{width:42px;height:42px;padding:0;border-radius:14px;font-size:20px;justify-content:center;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* CARDS */
+.card{background:var(--bg2);border-radius:var(--r);margin:0 14px 10px;padding:15px;border:1px solid var(--border);box-shadow:var(--shadow);}
+.card-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}
+
+/* CHIPS */
+.chip{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:50px;font-size:11px;font-weight:500;letter-spacing:.03em;transition:all .18s;}
+.chip-accent{background:var(--accent-dim);color:var(--accent);}
+.chip-green{background:var(--green-dim);color:var(--green);}
+.chip-amber{background:var(--amber-dim);color:var(--amber);}
+.chip-muted{background:var(--bg3);color:var(--text-soft);border:1px solid var(--border);}
+.chip-blue{background:var(--blue-dim);color:var(--blue);}
+.chip-red{background:var(--red-dim);color:var(--red);}
+.filter-chip{cursor:pointer;user-select:none;}
+.filter-chip:hover{filter:brightness(1.2);}
+.filter-chip.active-filter{box-shadow:0 0 0 2px currentColor;}
+
+/* FORMS */
+.form-group{margin-bottom:14px;}
+.form-label{display:block;font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;}
+.form-input,.form-select,.form-textarea{width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);font-family:var(--font-b);font-size:14px;color:var(--text);outline:none;transition:border-color .2s;}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);background:var(--bg4);}
+.form-input::placeholder{color:var(--text-muted);}
+.form-select option{background:var(--bg3);color:var(--text);}
+.form-textarea{resize:none;height:78px;}
+.form-row{display:flex;gap:10px;}
+.form-row .form-group{flex:1;}
+
+/* OVERLAY / DRAWER */
+.overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.68);backdrop-filter:blur(6px);align-items:flex-end;justify-content:center;}
+.overlay.open{display:flex;}
+.drawer{width:100%;max-width:430px;background:var(--bg2);border-radius:22px 22px 0 0;padding:8px 20px 44px;max-height:92dvh;overflow-y:auto;animation:slideUp .3s cubic-bezier(.32,1.25,.48,1);border-top:1px solid var(--border);}
+.drawer::-webkit-scrollbar{width:0;}
+@keyframes slideUp{from{transform:translateY(100%);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.drawer-handle{width:34px;height:3px;background:var(--border2);border-radius:2px;margin:10px auto 18px;}
+.drawer-title{font-family:var(--font-d);font-size:22px;font-weight:500;margin-bottom:18px;}
+.drawer-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;}
+.drawer-actions .btn{flex:1;justify-content:center;}
+
+/* AGENDA */
+.date-nav{display:flex;align-items:center;gap:10px;padding:4px 18px 14px;}
+.date-nav .cur{flex:1;text-align:center;font-family:var(--font-d);font-size:17px;font-weight:500;}
+.loc-filters{display:flex;gap:7px;padding:0 16px 14px;flex-wrap:wrap;}
+.agenda-list{padding:0 14px;}
+.agenda-block{display:flex;gap:10px;align-items:stretch;margin-bottom:10px;}
+.ab-time{width:44px;flex-shrink:0;font-size:12px;font-weight:500;color:var(--accent);padding-top:13px;letter-spacing:.02em;}
+.ab-card{flex:1;border-radius:var(--r-sm);padding:11px 13px;cursor:pointer;transition:all .18s;position:relative;overflow:hidden;border:1px solid transparent;}
+.ab-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+.ab-card.loc-studio{background:rgba(200,168,130,.08);border-color:rgba(200,168,130,.2);}
+.ab-card.loc-studio::before{background:var(--accent);}
+.ab-card.loc-niteroi{background:rgba(122,154,191,.08);border-color:rgba(122,154,191,.2);}
+.ab-card.loc-niteroi::before{background:var(--blue);}
+.ab-card.loc-domicilio{background:rgba(109,170,122,.08);border-color:rgba(109,170,122,.2);}
+.ab-card.loc-domicilio::before{background:var(--green);}
+.ab-card:active{transform:scale(.98);}
+.ab-name{font-size:13px;font-weight:500;margin-bottom:3px;}
+.ab-meta{font-size:11px;color:var(--text-soft);display:flex;gap:8px;flex-wrap:wrap;}
+.agenda-gap{display:flex;align-items:center;gap:10px;padding:4px 14px;}
+.gap-label{width:44px;font-size:10px;color:var(--text-muted);flex-shrink:0;}
+.gap-line{flex:1;border-top:1.5px dashed var(--border2);opacity:.5;}
+.empty-day{text-align:center;padding:50px 20px;color:var(--text-muted);}
+.empty-day .ei{font-size:32px;margin-bottom:10px;}
+.empty-day p{font-size:13px;line-height:1.6;}
+
+/* CLIENTS */
+.search-bar{margin:0 14px 12px;position:relative;}
+.search-bar input{width:100%;padding:11px 14px 11px 38px;background:var(--bg3);border:1px solid var(--border2);border-radius:50px;font-family:var(--font-b);font-size:14px;color:var(--text);outline:none;}
+.search-bar input:focus{border-color:var(--accent);}
+.search-bar input::placeholder{color:var(--text-muted);}
+.si{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:15px;}
+.client-av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-size:16px;font-weight:500;color:#111;flex-shrink:0;}
+.client-info h3{font-size:14px;font-weight:500;}
+.client-info p{font-size:12px;color:var(--text-muted);margin-top:1px;}
+
+/* PACKAGES */
+.pkg-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.pkg-info h3{font-size:14px;font-weight:500;}
+.pkg-info p{font-size:12px;color:var(--text-muted);margin-top:1px;}
+.progress-bar{height:5px;background:var(--bg4);border-radius:50px;overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:50px;transition:width .5s cubic-bezier(.4,0,.2,1);}
+.progress-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:4px;}
+.sessions-dots{display:flex;gap:4px;flex-wrap:wrap;margin:10px 0 6px;}
+.sd{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border2);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--text-muted);transition:all .2s;}
+.sd.used{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:var(--accent2);color:#111;}
+.sd.used::after{content:'✓';}
+.sd:not(.used)::after{content:attr(data-n);}
+
+/* FINANCIAL */
+.fin-card{background:var(--bg3);border-radius:var(--r-sm);padding:12px 14px;margin-top:12px;border:1px solid var(--border);}
+.fc-title{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;font-weight:500;}
+.fin-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;}
+.fin-row:not(:last-child){border-bottom:1px solid var(--border);}
+.fin-label{font-size:12px;color:var(--text-soft);}
+.fin-val{font-size:13px;font-weight:500;}
+.fin-highlight{color:var(--accent);}
+.fin-divider{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin:6px 0 12px;padding-top:8px;border-top:1px solid var(--border);font-weight:500;}
+
+/* DETAIL */
+.detail-hdr{padding:18px 20px;display:flex;align-items:center;gap:14px;background:var(--bg2);border-bottom:1px solid var(--border);}
+.detail-av{width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-size:24px;font-weight:500;color:#111;flex-shrink:0;}
+.hist-item{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border);}
+.hist-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:5px;flex-shrink:0;}
+.hist-text h4{font-size:13px;font-weight:500;}
+.hist-text p{font-size:11px;color:var(--text-muted);margin-top:2px;}
+
+/* LOADING */
+.loader-overlay{display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.7);align-items:center;justify-content:center;flex-direction:column;gap:12px;}
+.loader-overlay.show{display:flex;}
+.spinner{width:32px;height:32px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loader-text{font-size:13px;color:var(--text-soft);}
+
+/* SKELETON */
+.skeleton{background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.2s infinite;border-radius:8px;}
+@keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+
+/* TOAST */
+#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--bg4);color:var(--text);padding:10px 20px;border-radius:50px;font-size:13px;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;white-space:nowrap;border:1px solid var(--border2);box-shadow:0 8px 30px rgba(0,0,0,.5);}
+#toast.show{opacity:1;}
+
+.empty-state{text-align:center;padding:40px 30px;color:var(--text-muted);}
+.empty-state .ei{font-size:32px;margin-bottom:10px;}
+.empty-state p{font-size:13px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="app-header">
+    <div class="header-brand">
+      <div class="brand-logo">🌿</div>
+      <div class="brand-text"><h1>Bem Estar</h1><p>Thamiris Barone · Estética</p></div>
+    </div>
+    <div class="header-date" id="headerDate"></div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('agenda')" data-tab="agenda"><span class="ti">📅</span>Agenda</button>
+    <button class="nav-tab" onclick="showPage('clientes')" data-tab="clientes"><span class="ti">👥</span>Clientes</button>
+    <button class="nav-tab" onclick="showPage('pacotes')" data-tab="pacotes"><span class="ti">📦</span>Pacotes</button>
+  </div>
+  <div class="content">
+
+    <!-- AGENDA -->
+    <div class="page active" id="page-agenda">
+      <div class="sec-hdr">
+        <div><div class="sec-title">Agenda</div><div class="sec-sub" id="agendaSub"></div></div>
+        <button class="btn btn-primary btn-add" onclick="openApptForm()">+</button>
+      </div>
+      <div class="date-nav">
+        <button class="btn btn-icon" onclick="changeDay(-1)">‹</button>
+        <div class="cur" id="currentDate"></div>
+        <button class="btn btn-icon" onclick="changeDay(1)">›</button>
+      </div>
+      <div class="loc-filters">
+        <span class="chip chip-muted filter-chip active-filter" data-loc="all"       onclick="setLocFilter('all')">Todos</span>
+        <span class="chip chip-accent filter-chip"             data-loc="studio"     onclick="setLocFilter('studio')">🌿 Estúdio</span>
+        <span class="chip chip-blue filter-chip"               data-loc="niteroi"    onclick="setLocFilter('niteroi')">🌊 Niterói</span>
+        <span class="chip chip-green filter-chip"              data-loc="domicilio"  onclick="setLocFilter('domicilio')">🏠 Domicílio</span>
+      </div>
+      <div class="agenda-list" id="agendaList"></div>
+    </div>
+
+    <!-- CLIENTES -->
+    <div class="page" id="page-clientes">
+      <div class="sec-hdr">
+        <div><div class="sec-title">Clientes</div><div class="sec-sub" id="clientCount"></div></div>
+        <button class="btn btn-primary btn-add" onclick="openClientForm()">+</button>
+      </div>
+      <div class="search-bar">
+        <span class="si">🔍</span>
+        <input type="text" placeholder="Buscar cliente..." id="searchInput" oninput="filterClients()">
+      </div>
+      <div id="clientList"></div>
+    </div>
+
+    <!-- PACOTES -->
+    <div class="page" id="page-pacotes">
+      <div class="sec-hdr">
+        <div><div class="sec-title">Pacotes</div><div class="sec-sub" id="pkgCount"></div></div>
+        <button class="btn btn-primary btn-add" onclick="openPkgForm()">+</button>
+      </div>
+      <div id="packageList"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loader-overlay" id="loaderOverlay">
+  <div class="spinner"></div>
+  <div class="loader-text" id="loaderText">Carregando...</div>
+</div>
+
+<div id="toast"></div>
+
+<!-- DRAWER: AGENDAMENTO -->
+<div class="overlay" id="apptOverlay" onclick="closeOverlay('apptOverlay')">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title" id="apptDrawerTitle">Novo Agendamento</div>
+    <input type="hidden" id="apptEditId">
+    <div class="form-group">
+      <label class="form-label">Nome da cliente</label>
+      <input type="text" class="form-input" id="apptClientName" placeholder="Digite o nome..." list="clientNameList" autocomplete="off">
+      <datalist id="clientNameList"></datalist>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Serviço / Tratamento</label>
+      <input type="text" class="form-input" id="apptService" placeholder="Ex: Drenagem pós cirúrgica" list="serviceList" autocomplete="off">
+      <datalist id="serviceList">
+        <option>Limpeza de pele</option><option>Tratamento de acne</option>
+        <option>Massagem modeladora</option><option>Drenagem pós cirúrgica</option>
+        <option>Power bumbum na nuca</option>
+      </datalist>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Local</label>
+      <select class="form-select" id="apptLocation">
+        <option value="studio">🌿 Estúdio São Gonçalo</option>
+        <option value="niteroi">🌊 Clínica Niterói</option>
+        <option value="domicilio">🏠 Domicílio</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Data</label>
+        <input type="date" class="form-input" id="apptDate">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Horário</label>
+        <select class="form-select" id="apptTime"></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observações</label>
+      <textarea class="form-textarea" id="apptNotes" placeholder="Alguma observação..."></textarea>
+    </div>
+    <div class="drawer-actions">
+      <button class="btn btn-ghost" onclick="closeOverlay('apptOverlay')">Cancelar</button>
+      <button class="btn btn-primary" id="apptSaveBtn" onclick="saveAppt()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- DRAWER: CLIENTE -->
+<div class="overlay" id="clientOverlay" onclick="closeOverlay('clientOverlay')">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title" id="clientDrawerTitle">Nova Cliente</div>
+    <input type="hidden" id="clientEditId">
+    <div class="form-group">
+      <label class="form-label">Nome completo</label>
+      <input type="text" class="form-input" id="clientName" placeholder="Ex: Ana Lima">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Telefone / WhatsApp</label>
+      <input type="tel" class="form-input" id="clientPhone" placeholder="(21) 9xxxx-xxxx">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observações</label>
+      <textarea class="form-textarea" id="clientNotes" placeholder="Informações sobre a cliente..."></textarea>
+    </div>
+    <div class="drawer-actions">
+      <button class="btn btn-ghost" onclick="closeOverlay('clientOverlay')">Cancelar</button>
+      <button class="btn btn-primary" id="clientSaveBtn" onclick="saveClient()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- DRAWER: PACOTE -->
+<div class="overlay" id="pkgOverlay" onclick="closeOverlay('pkgOverlay')">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title" id="pkgDrawerTitle">Novo Pacote</div>
+    <input type="hidden" id="pkgEditId">
+    <div class="form-group">
+      <label class="form-label">Nome da cliente</label>
+      <input type="text" class="form-input" id="pkgClientName" placeholder="Digite o nome..." list="pkgClientList" autocomplete="off">
+      <datalist id="pkgClientList"></datalist>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Serviço</label>
+      <input type="text" class="form-input" id="pkgService" placeholder="Ex: Massagem modeladora" list="pkgSvcList" autocomplete="off">
+      <datalist id="pkgSvcList">
+        <option>Limpeza de pele</option><option>Tratamento de acne</option>
+        <option>Massagem modeladora</option><option>Drenagem pós cirúrgica</option>
+        <option>Power bumbum na nuca</option>
+      </datalist>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Total de sessões</label>
+        <input type="number" class="form-input" id="pkgTotal" min="1" max="99" value="10">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Já realizadas</label>
+        <input type="number" class="form-input" id="pkgUsed" min="0" value="0">
+      </div>
+    </div>
+    <div class="fin-divider">💳 Financeiro</div>
+    <div class="form-group">
+      <label class="form-label">Valor total do pacote (R$)</label>
+      <input type="number" class="form-input" id="pkgPrice" min="0" step="0.01" placeholder="Ex: 850.00">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Forma de pagamento</label>
+      <select class="form-select" id="pkgPayMethod">
+        <option value="">Selecione...</option>
+        <option value="avista">À vista (dinheiro)</option>
+        <option value="pix">PIX</option>
+        <option value="debito">Cartão débito</option>
+        <option value="credito">Cartão crédito</option>
+        <option value="parcelado">Cartão crédito parcelado</option>
+      </select>
+    </div>
+    <div class="form-group" id="pkgParcelasGroup" style="display:none;">
+      <label class="form-label">Número de parcelas</label>
+      <select class="form-select" id="pkgParcelas">
+        <option value="2">2x</option><option value="3">3x</option><option value="4">4x</option>
+        <option value="5">5x</option><option value="6">6x</option><option value="7">7x</option>
+        <option value="8">8x</option><option value="9">9x</option><option value="10">10x</option>
+        <option value="11">11x</option><option value="12">12x</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Status do pagamento</label>
+      <select class="form-select" id="pkgPayStatus">
+        <option value="pendente">Pendente</option>
+        <option value="parcial">Parcialmente pago</option>
+        <option value="pago">Pago</option>
+      </select>
+    </div>
+    <div class="drawer-actions">
+      <button class="btn btn-ghost" onclick="closeOverlay('pkgOverlay')">Cancelar</button>
+      <button class="btn btn-primary" id="pkgSaveBtn" onclick="savePkg()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- DRAWER: DETALHE CLIENTE -->
+<div class="overlay" id="clientDetailOverlay" onclick="closeOverlay('clientDetailOverlay')">
+  <div class="drawer" onclick="event.stopPropagation()" style="padding:0 0 44px;">
+    <div style="padding:8px 20px 0;"><div class="drawer-handle"></div></div>
+    <div class="detail-hdr">
+      <div class="detail-av" id="detailAvatar"></div>
+      <div>
+        <div style="font-family:var(--font-d);font-size:20px;font-weight:500;" id="detailName"></div>
+        <div style="font-size:13px;color:var(--text-soft);margin-top:2px;" id="detailPhone"></div>
+      </div>
+    </div>
+    <div style="padding:16px 20px 0;">
+      <div class="form-label" style="margin-bottom:6px;">Observações</div>
+      <div id="detailNotes" style="font-size:13px;color:var(--text-soft);line-height:1.6;"></div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-wa" onclick="openWhatsApp(currentDetailClientId)">💬 WhatsApp</button>
+        <button class="btn btn-ghost btn-sm" onclick="editClientDetail()">✏️ Editar</button>
+        <button class="btn btn-red" onclick="deleteClientDetail()">🗑️ Excluir</button>
+      </div>
+      <div style="margin-top:20px;">
+        <div class="form-label" style="margin-bottom:8px;">Histórico de Atendimentos</div>
+        <div id="detailHistory"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DRAWER: DETALHE AGENDAMENTO -->
+<div class="overlay" id="apptDetailOverlay" onclick="closeOverlay('apptDetailOverlay')">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title" id="apptDetailTitle">Agendamento</div>
+    <div id="apptDetailBody"></div>
+    <div class="drawer-actions">
+      <button class="btn btn-amber" onclick="rescheduleAppt()">🔁 Remarcar</button>
+      <button class="btn btn-ghost" onclick="editApptDetail()">✏️ Editar</button>
+      <button class="btn btn-red"   onclick="deleteApptDetail()">🗑️ Excluir</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  SUPABASE CONFIG
+// ══════════════════════════════════════════
+const SB_URL = 'https://rdyxsxrqaragffgdcqkg.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkeXhzeHJxYXJhZ2ZmZ2RjcWtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzNDA0NzYsImV4cCI6MjA5MDkxNjQ3Nn0.9IF5IN1ym_03USDjeuV4uQRL1oVCRyoHX_L6iySq1l0';
+
+const SB_HEADERS = {
+  'apikey': SB_KEY,
+  'Authorization': `Bearer ${SB_KEY}`,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation'
+};
+
+async function sbGet(table, query = '') {
+  const res = await fetch(`${SB_URL}/rest/v1/${table}?${query}&order=created_at.asc`, {
+    headers: SB_HEADERS
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function sbInsert(table, body) {
+  const res = await fetch(`${SB_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: SB_HEADERS,
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function sbUpdate(table, id, body) {
+  const res = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: SB_HEADERS,
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function sbDelete(table, id) {
+  const res = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: { ...SB_HEADERS, 'Prefer': '' }
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// ══════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════
+const LOC_MAP   = {studio:'Estúdio SGC', niteroi:'Niterói', domicilio:'Domicílio'};
+const LOC_EMOJI = {studio:'🌿', niteroi:'🌊', domicilio:'🏠'};
+const PAY_LABEL = {avista:'À vista', pix:'PIX', debito:'Cartão débito', credito:'Cartão crédito', parcelado:'Crédito parcelado'};
+const STATUS_LABEL = {pendente:'Pendente', pago:'Pago', parcial:'Parcial'};
+const STATUS_CHIP  = {pendente:'chip-amber', pago:'chip-green', parcial:'chip-blue'};
+
+const HOURS = (() => {
+  const s = []; let h = 9, m = 0;
+  while (h < 19 || (h === 19 && m === 0)) {
+    s.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+    m += 10; if (m >= 60) { h++; m = 0; }
+  }
+  return s;
+})();
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let currentDateStr        = todayStr();
+let currentLocFilter      = 'all';
+let currentDetailClientId = null;
+let currentDetailClient   = null;
+let currentDetailAppt     = null;
+
+// In-memory cache to avoid refetching constantly
+let cache = { clients: null, appts: null, pkgs: null };
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ══════════════════════════════════════════
+//  LOADER
+// ══════════════════════════════════════════
+function showLoader(msg = 'Salvando...') {
+  document.getElementById('loaderText').textContent = msg;
+  document.getElementById('loaderOverlay').classList.add('show');
+}
+function hideLoader() {
+  document.getElementById('loaderOverlay').classList.remove('show');
+}
+
+// ══════════════════════════════════════════
+//  NAV
+// ══════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  document.querySelector(`[data-tab="${name}"]`).classList.add('active');
+  if (name === 'agenda')   renderAgenda();
+  if (name === 'clientes') renderClients();
+  if (name === 'pacotes')  renderPkgs();
+}
+
+// ══════════════════════════════════════════
+//  HEADER
+// ══════════════════════════════════════════
+function initHeader() {
+  const d = new Date();
+  const days = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  const months = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  document.getElementById('headerDate').innerHTML =
+    `<span>${days[d.getDay()]}</span>, ${d.getDate()} de ${months[d.getMonth()]}. de ${d.getFullYear()}`;
+}
+
+function fmtDate(str) {
+  const [y,m,d] = str.split('-');
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const days   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const dt = new Date(+y, +m-1, +d);
+  return `${days[dt.getDay()]}, ${d} ${months[+m-1]}`;
+}
+
+function changeDay(delta) {
+  const [y,m,d] = currentDateStr.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  dt.setDate(dt.getDate() + delta);
+  currentDateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  renderAgenda();
+}
+
+// ══════════════════════════════════════════
+//  LOCATION FILTER
+// ══════════════════════════════════════════
+function setLocFilter(loc) {
+  currentLocFilter = loc;
+  document.querySelectorAll('.filter-chip').forEach(c =>
+    c.classList.toggle('active-filter', c.dataset.loc === loc));
+  renderAgenda();
+}
+
+// ══════════════════════════════════════════
+//  AGENDA
+// ══════════════════════════════════════════
+async function renderAgenda() {
+  document.getElementById('currentDate').textContent = fmtDate(currentDateStr);
+  document.getElementById('agendaSub').textContent = 'Carregando...';
+  document.getElementById('agendaList').innerHTML =
+    `<div style="padding:20px 14px;display:flex;flex-direction:column;gap:10px;">
+      ${[1,2,3].map(()=>`<div class="skeleton" style="height:58px;border-radius:12px;"></div>`).join('')}
+    </div>`;
+
+  try {
+    const appts = await sbGet('appointments', `date=eq.${currentDateStr}`);
+    cache.appts = appts;
+
+    let dayAppts = [...appts];
+    const totalDay = dayAppts.length;
+    if (currentLocFilter !== 'all') dayAppts = dayAppts.filter(a => a.location === currentLocFilter);
+    dayAppts.sort((a,b) => a.time.localeCompare(b.time));
+
+    document.getElementById('agendaSub').textContent =
+      `${totalDay} atendimento${totalDay !== 1 ? 's' : ''} · ${fmtDate(currentDateStr)}`;
+
+    const list = document.getElementById('agendaList');
+    if (!dayAppts.length) {
+      list.innerHTML = `<div class="empty-day"><div class="ei">📭</div>
+        <p>${currentLocFilter !== 'all' ? 'Nenhum atendimento neste local hoje.' : 'Nenhum atendimento agendado para este dia.'}</p>
+        <button class="btn btn-primary" onclick="openApptForm()" style="margin-top:16px;">+ Novo agendamento</button></div>`;
+      return;
+    }
+
+    let html = '';
+    if (dayAppts[0].time !== '09:00') {
+      html += `<div class="agenda-gap"><div class="gap-label">09:00</div><div class="gap-line"></div></div>`;
+    }
+    dayAppts.forEach((a, i) => {
+      if (i > 0) html += `<div class="agenda-gap"><div class="gap-label"></div><div class="gap-line"></div></div>`;
+      html += `<div class="agenda-block">
+        <div class="ab-time">${a.time}</div>
+        <div class="ab-card loc-${a.location}" onclick="openApptDetail('${a.id}')">
+          <div class="ab-name">${a.client_name}</div>
+          <div class="ab-meta"><span>${a.service}</span><span>${LOC_EMOJI[a.location]} ${LOC_MAP[a.location]}</span></div>
+        </div>
+      </div>`;
+    });
+    if (dayAppts[dayAppts.length-1].time !== '19:00') {
+      html += `<div class="agenda-gap"><div class="gap-label">19:00</div><div class="gap-line"></div></div>`;
+    }
+    list.innerHTML = html;
+  } catch(e) {
+    document.getElementById('agendaList').innerHTML =
+      `<div class="empty-state"><div class="ei">⚠️</div><p>Erro ao carregar agenda.<br>Verifique sua conexão.</p></div>`;
+    console.error(e);
+  }
+}
+
+// ══════════════════════════════════════════
+//  APPT FORM
+// ══════════════════════════════════════════
+function buildTimeOpts(sel = '09:00') {
+  document.getElementById('apptTime').innerHTML =
+    HOURS.map(h => `<option value="${h}"${h === sel ? ' selected' : ''}>${h}</option>`).join('');
+}
+
+async function buildDatalist() {
+  try {
+    const clients = await sbGet('clients');
+    cache.clients = clients;
+    const opts = clients.map(c => `<option value="${c.name}">`).join('');
+    ['clientNameList','pkgClientList'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = opts;
+    });
+  } catch(e) { console.error('datalist error', e); }
+}
+
+function openApptForm(presetTime = '', apptId = '') {
+  buildDatalist();
+  buildTimeOpts(presetTime || '09:00');
+  document.getElementById('apptDate').value = currentDateStr;
+  document.getElementById('apptEditId').value = apptId;
+  document.getElementById('apptClientName').value = '';
+  document.getElementById('apptService').value = '';
+  document.getElementById('apptNotes').value = '';
+  document.getElementById('apptLocation').value = 'studio';
+
+  if (apptId) {
+    const a = (cache.appts || []).find(x => x.id === apptId);
+    if (a) {
+      document.getElementById('apptDrawerTitle').textContent = 'Editar Agendamento';
+      document.getElementById('apptClientName').value = a.client_name;
+      document.getElementById('apptService').value = a.service;
+      document.getElementById('apptLocation').value = a.location;
+      document.getElementById('apptDate').value = a.date;
+      buildTimeOpts(a.time);
+      document.getElementById('apptNotes').value = a.notes || '';
+    }
+  } else {
+    document.getElementById('apptDrawerTitle').textContent = 'Novo Agendamento';
+  }
+  openOverlay('apptOverlay');
+}
+
+async function saveAppt() {
+  const clientName = document.getElementById('apptClientName').value.trim();
+  const service    = document.getElementById('apptService').value.trim();
+  const location   = document.getElementById('apptLocation').value;
+  const date       = document.getElementById('apptDate').value;
+  const time       = document.getElementById('apptTime').value;
+  const notes      = document.getElementById('apptNotes').value;
+  const editId     = document.getElementById('apptEditId').value;
+
+  if (!clientName || !service || !date) { showToast('Preencha nome, serviço e data.'); return; }
+
+  const btn = document.getElementById('apptSaveBtn');
+  btn.disabled = true;
+  showLoader('Salvando agendamento...');
+
+  try {
+    if (editId) {
+      await sbUpdate('appointments', editId, {client_name: clientName, service, location, date, time, notes});
+      showToast('✅ Agendamento atualizado!');
+    } else {
+      await sbInsert('appointments', {client_name: clientName, service, location, date, time, notes});
+      showToast('✅ Agendamento criado!');
+    }
+    cache.appts = null;
+    closeOverlay('apptOverlay');
+    await renderAgenda();
+  } catch(e) {
+    showToast('❌ Erro ao salvar. Tente novamente.');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    hideLoader();
+  }
+}
+
+function openApptDetail(id) {
+  const appts = cache.appts || [];
+  const a = appts.find(x => x.id === id);
+  if (!a) return;
+  currentDetailAppt = a;
+  const clients = cache.clients || [];
+  const client = clients.find(c => c.name.toLowerCase() === a.client_name.toLowerCase());
+
+  document.getElementById('apptDetailTitle').textContent = a.client_name;
+  document.getElementById('apptDetailBody').innerHTML = `
+    <div class="card" style="margin:0 0 12px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <span class="chip chip-accent">${a.service}</span>
+        <span class="chip chip-muted">${LOC_EMOJI[a.location]} ${LOC_MAP[a.location]}</span>
+      </div>
+      <div style="font-size:13px;color:var(--text-soft);">📅 ${fmtDate(a.date)} · ⏰ ${a.time}</div>
+      ${a.notes ? `<div style="margin-top:8px;font-size:13px;color:var(--text-muted);font-style:italic;">"${a.notes}"</div>` : ''}
+    </div>
+    ${client ? `<button class="btn btn-wa" style="width:100%;justify-content:center;" onclick="openWhatsApp('${client.id}','${a.time}')">💬 Confirmar via WhatsApp</button>` : ''}`;
+  openOverlay('apptDetailOverlay');
+}
+
+function editApptDetail() {
+  if (!currentDetailAppt) return;
+  currentDateStr = currentDetailAppt.date;
+  closeOverlay('apptDetailOverlay');
+  openApptForm(currentDetailAppt.time, currentDetailAppt.id);
+}
+
+async function deleteApptDetail() {
+  if (!currentDetailAppt) return;
+  showLoader('Excluindo...');
+  try {
+    await sbDelete('appointments', currentDetailAppt.id);
+    cache.appts = null;
+    closeOverlay('apptDetailOverlay');
+    await renderAgenda();
+    showToast('🗑️ Agendamento excluído.');
+  } catch(e) {
+    showToast('❌ Erro ao excluir.');
+  } finally { hideLoader(); }
+}
+
+function rescheduleAppt() {
+  if (!currentDetailAppt) return;
+  closeOverlay('apptDetailOverlay');
+  openApptForm(currentDetailAppt.time, currentDetailAppt.id);
+}
+
+// ══════════════════════════════════════════
+//  CLIENTS
+// ══════════════════════════════════════════
+async function renderClients(filter = '') {
+  document.getElementById('clientCount').textContent = 'Carregando...';
+  document.getElementById('clientList').innerHTML =
+    `<div style="padding:0 14px;display:flex;flex-direction:column;gap:10px;">
+      ${[1,2,3].map(()=>`<div class="skeleton" style="height:72px;border-radius:16px;"></div>`).join('')}
+    </div>`;
+
+  try {
+    let clients = await sbGet('clients');
+    cache.clients = clients;
+    if (filter) clients = clients.filter(c =>
+      c.name.toLowerCase().includes(filter.toLowerCase()) || c.phone.includes(filter));
+
+    document.getElementById('clientCount').textContent =
+      `${clients.length} cliente${clients.length !== 1 ? 's' : ''} cadastrada${clients.length !== 1 ? 's' : ''}`;
+
+    const list = document.getElementById('clientList');
+    if (!clients.length) {
+      list.innerHTML = `<div class="empty-state"><div class="ei">👥</div><p>Nenhuma cliente encontrada.</p></div>`;
+      return;
+    }
+    list.innerHTML = clients.map(c => `
+      <div class="card" onclick="openClientDetail('${c.id}')" style="cursor:pointer;">
+        <div class="card-row">
+          <div style="display:flex;gap:12px;align-items:center;flex:1;min-width:0;">
+            <div class="client-av">${c.name.charAt(0)}</div>
+            <div class="client-info"><h3>${c.name}</h3><p>${c.phone}</p></div>
+          </div>
+          <div onclick="event.stopPropagation()">
+            <button class="btn btn-wa btn-sm" onclick="openWhatsApp('${c.id}')">💬</button>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('clientList').innerHTML =
+      `<div class="empty-state"><div class="ei">⚠️</div><p>Erro ao carregar clientes.</p></div>`;
+    console.error(e);
+  }
+}
+
+function filterClients() {
+  renderClients(document.getElementById('searchInput').value);
+}
+
+function openClientForm(id = '') {
+  document.getElementById('clientEditId').value = id;
+  ['clientName','clientPhone','clientNotes'].forEach(f => document.getElementById(f).value = '');
+  if (id) {
+    const c = (cache.clients || []).find(x => x.id === id);
+    if (c) {
+      document.getElementById('clientDrawerTitle').textContent = 'Editar Cliente';
+      document.getElementById('clientName').value  = c.name;
+      document.getElementById('clientPhone').value = c.phone;
+      document.getElementById('clientNotes').value = c.notes || '';
+    }
+  } else {
+    document.getElementById('clientDrawerTitle').textContent = 'Nova Cliente';
+  }
+  openOverlay('clientOverlay');
+}
+
+async function saveClient() {
+  const name   = document.getElementById('clientName').value.trim();
+  const phone  = document.getElementById('clientPhone').value.trim();
+  const notes  = document.getElementById('clientNotes').value.trim();
+  const editId = document.getElementById('clientEditId').value;
+  if (!name || !phone) { showToast('Nome e telefone são obrigatórios.'); return; }
+
+  const btn = document.getElementById('clientSaveBtn');
+  btn.disabled = true;
+  showLoader('Salvando cliente...');
+
+  try {
+    if (editId) {
+      await sbUpdate('clients', editId, {name, phone, notes});
+      showToast('✅ Cliente atualizada!');
+    } else {
+      await sbInsert('clients', {name, phone, notes});
+      showToast('✅ Cliente cadastrada!');
+    }
+    cache.clients = null;
+    closeOverlay('clientOverlay');
+    await renderClients();
+    await buildDatalist();
+  } catch(e) {
+    showToast('❌ Erro ao salvar cliente.');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    hideLoader();
+  }
+}
+
+async function openClientDetail(id) {
+  currentDetailClientId = id;
+  try {
+    const clients = cache.clients || await sbGet('clients');
+    cache.clients = clients;
+    const c = clients.find(x => x.id === id);
+    if (!c) return;
+    currentDetailClient = c;
+
+    document.getElementById('detailAvatar').textContent = c.name.charAt(0);
+    document.getElementById('detailName').textContent  = c.name;
+    document.getElementById('detailPhone').textContent = c.phone;
+    document.getElementById('detailNotes').textContent = c.notes || 'Sem observações.';
+    document.getElementById('detailHistory').innerHTML =
+      `<div class="skeleton" style="height:40px;border-radius:8px;margin-bottom:8px;"></div>
+       <div class="skeleton" style="height:40px;border-radius:8px;"></div>`;
+
+    openOverlay('clientDetailOverlay');
+
+    const appts = await sbGet('appointments', `client_name=eq.${encodeURIComponent(c.name)}`);
+    appts.sort((a,b) => (b.date+b.time).localeCompare(a.date+a.time));
+    document.getElementById('detailHistory').innerHTML = !appts.length
+      ? '<div style="font-size:13px;color:var(--text-muted);">Nenhum atendimento registrado.</div>'
+      : appts.map(a => `<div class="hist-item">
+          <div class="hist-dot"></div>
+          <div class="hist-text">
+            <h4>${a.service}</h4>
+            <p>${fmtDate(a.date)} · ${a.time} · ${LOC_MAP[a.location]}</p>
+          </div>
+        </div>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+function editClientDetail() {
+  closeOverlay('clientDetailOverlay');
+  openClientForm(currentDetailClientId);
+}
+
+async function deleteClientDetail() {
+  if (!currentDetailClientId) return;
+  showLoader('Excluindo...');
+  try {
+    await sbDelete('clients', currentDetailClientId);
+    cache.clients = null;
+    closeOverlay('clientDetailOverlay');
+    await renderClients();
+    showToast('🗑️ Cliente excluída.');
+  } catch(e) {
+    showToast('❌ Erro ao excluir.');
+  } finally { hideLoader(); }
+}
+
+// ══════════════════════════════════════════
+//  PACKAGES
+// ══════════════════════════════════════════
+async function renderPkgs() {
+  document.getElementById('pkgCount').textContent = 'Carregando...';
+  document.getElementById('packageList').innerHTML =
+    `<div style="padding:0 14px;display:flex;flex-direction:column;gap:10px;">
+      ${[1,2].map(()=>`<div class="skeleton" style="height:140px;border-radius:16px;"></div>`).join('')}
+    </div>`;
+
+  try {
+    const pkgs = await sbGet('packages');
+    cache.pkgs = pkgs;
+    document.getElementById('pkgCount').textContent =
+      `${pkgs.length} pacote${pkgs.length !== 1 ? 's' : ''} ativo${pkgs.length !== 1 ? 's' : ''}`;
+
+    const list = document.getElementById('packageList');
+    if (!pkgs.length) {
+      list.innerHTML = `<div class="empty-state"><div class="ei">📦</div><p>Nenhum pacote cadastrado.</p></div>`;
+      return;
+    }
+
+    list.innerHTML = pkgs.map(p => {
+      const pct  = Math.round((p.used / p.total) * 100);
+      const rem  = p.total - p.used;
+      const done = p.used >= p.total;
+      const dots = Array.from({length: p.total}, (_,i) =>
+        `<div class="sd ${i < p.used ? 'used' : ''}" data-n="${i+1}"></div>`).join('');
+
+      let fin = '';
+      if (p.price) {
+        const priceStr = `R$ ${Number(p.price).toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
+        const payStr   = (PAY_LABEL[p.pay_method] || '—') +
+          (p.pay_method === 'parcelado' && p.parcelas ? ` em ${p.parcelas}x` : '');
+        const perSess  = `R$ ${(p.price / p.total).toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
+        const sc = STATUS_CHIP[p.pay_status] || 'chip-muted';
+        const sl = STATUS_LABEL[p.pay_status] || '—';
+        fin = `<div class="fin-card">
+          <div class="fc-title">💳 Financeiro</div>
+          <div class="fin-row"><span class="fin-label">Valor total</span><span class="fin-val fin-highlight">${priceStr}</span></div>
+          <div class="fin-row"><span class="fin-label">Pagamento</span><span class="fin-val">${payStr}</span></div>
+          <div class="fin-row"><span class="fin-label">Por sessão</span><span class="fin-val">${perSess}</span></div>
+          <div class="fin-row"><span class="fin-label">Status</span><span class="chip ${sc}" style="font-size:11px;padding:2px 10px;">${sl}</span></div>
+        </div>`;
+      }
+
+      return `<div class="card">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <div class="pkg-icon">💆</div>
+          <div class="pkg-info" style="flex:1;"><h3>${p.client_name}</h3><p>${p.service}</p></div>
+          ${done ? '<span class="chip chip-green">✓ Concluído</span>' : `<span class="chip chip-accent">${rem} rest.</span>`}
+        </div>
+        <div style="margin-top:12px;">
+          <div class="sessions-dots">${dots}</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <div class="progress-labels"><span>${p.used} realizadas</span><span>${p.total} total</span></div>
+        </div>
+        ${fin}
+        <div class="card-actions">
+          ${!done ? `<button class="btn btn-green" onclick="useSession('${p.id}')">✓ Marcar sessão</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="openPkgForm('${p.id}')">✏️ Editar</button>
+          <button class="btn btn-red" onclick="deletePkg('${p.id}')">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('packageList').innerHTML =
+      `<div class="empty-state"><div class="ei">⚠️</div><p>Erro ao carregar pacotes.</p></div>`;
+    console.error(e);
+  }
+}
+
+function openPkgForm(pkgId = '') {
+  buildDatalist();
+  document.getElementById('pkgEditId').value = pkgId;
+  ['pkgClientName','pkgService','pkgPrice'].forEach(f => document.getElementById(f).value = '');
+  document.getElementById('pkgTotal').value     = 10;
+  document.getElementById('pkgUsed').value      = 0;
+  document.getElementById('pkgPayMethod').value = '';
+  document.getElementById('pkgParcelas').value  = '2';
+  document.getElementById('pkgPayStatus').value = 'pendente';
+  document.getElementById('pkgParcelasGroup').style.display = 'none';
+
+  if (pkgId) {
+    const p = (cache.pkgs || []).find(x => x.id === pkgId);
+    if (p) {
+      document.getElementById('pkgDrawerTitle').textContent = 'Editar Pacote';
+      document.getElementById('pkgClientName').value = p.client_name;
+      document.getElementById('pkgService').value    = p.service;
+      document.getElementById('pkgTotal').value      = p.total;
+      document.getElementById('pkgUsed').value       = p.used;
+      document.getElementById('pkgPrice').value      = p.price || '';
+      document.getElementById('pkgPayMethod').value  = p.pay_method || '';
+      document.getElementById('pkgParcelas').value   = p.parcelas || '2';
+      document.getElementById('pkgPayStatus').value  = p.pay_status || 'pendente';
+      document.getElementById('pkgParcelasGroup').style.display = p.pay_method === 'parcelado' ? 'block' : 'none';
+    }
+  } else {
+    document.getElementById('pkgDrawerTitle').textContent = 'Novo Pacote';
+  }
+  openOverlay('pkgOverlay');
+}
+
+document.getElementById('pkgPayMethod').addEventListener('change', function() {
+  document.getElementById('pkgParcelasGroup').style.display = this.value === 'parcelado' ? 'block' : 'none';
+});
+
+async function savePkg() {
+  const clientName = document.getElementById('pkgClientName').value.trim();
+  const service    = document.getElementById('pkgService').value.trim();
+  const total      = parseInt(document.getElementById('pkgTotal').value);
+  const used       = parseInt(document.getElementById('pkgUsed').value);
+  const price      = parseFloat(document.getElementById('pkgPrice').value) || null;
+  const payMethod  = document.getElementById('pkgPayMethod').value || null;
+  const parcelas   = payMethod === 'parcelado' ? parseInt(document.getElementById('pkgParcelas').value) : null;
+  const payStatus  = document.getElementById('pkgPayStatus').value;
+  const editId     = document.getElementById('pkgEditId').value;
+
+  if (!clientName || !service || isNaN(total) || total < 1) { showToast('Preencha nome, serviço e sessões.'); return; }
+  if (used > total) { showToast('Sessões realizadas não podem superar o total.'); return; }
+
+  const btn = document.getElementById('pkgSaveBtn');
+  btn.disabled = true;
+  showLoader('Salvando pacote...');
+
+  const payload = {
+    client_name: clientName, service, total, used,
+    price, pay_method: payMethod, parcelas, pay_status: payStatus
+  };
+
+  try {
+    if (editId) {
+      await sbUpdate('packages', editId, payload);
+      showToast('✅ Pacote atualizado!');
+    } else {
+      await sbInsert('packages', payload);
+      showToast('✅ Pacote criado!');
+    }
+    cache.pkgs = null;
+    closeOverlay('pkgOverlay');
+    await renderPkgs();
+  } catch(e) {
+    showToast('❌ Erro ao salvar pacote.');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    hideLoader();
+  }
+}
+
+async function useSession(id) {
+  const pkgs = cache.pkgs || [];
+  const p    = pkgs.find(x => x.id === id);
+  if (!p) return;
+  if (p.used >= p.total) { showToast('Todas as sessões já foram realizadas!'); return; }
+  showLoader('Marcando sessão...');
+  try {
+    await sbUpdate('packages', id, {used: p.used + 1});
+    cache.pkgs = null;
+    await renderPkgs();
+    const rem = p.total - (p.used + 1);
+    showToast(rem === 0 ? '🎉 Pacote concluído!' : `✅ Sessão marcada! ${rem} restante${rem !== 1 ? 's' : ''}.`);
+  } catch(e) {
+    showToast('❌ Erro ao marcar sessão.');
+  } finally { hideLoader(); }
+}
+
+async function deletePkg(id) {
+  showLoader('Excluindo...');
+  try {
+    await sbDelete('packages', id);
+    cache.pkgs = null;
+    await renderPkgs();
+    showToast('🗑️ Pacote excluído.');
+  } catch(e) {
+    showToast('❌ Erro ao excluir.');
+  } finally { hideLoader(); }
+}
+
+// ══════════════════════════════════════════
+//  WHATSAPP
+// ══════════════════════════════════════════
+function openWhatsApp(clientId, time = '') {
+  const clients = cache.clients || [];
+  const client  = clients.find(c => c.id === clientId);
+  if (!client) { showToast('Cliente não encontrada.'); return; }
+  const phone = client.phone.replace(/\D/g, '');
+  const first = client.name.split(' ')[0];
+  const msg = time
+    ? `Oi ${first}! Confirmando seu atendimento amanhã às ${time} no Bem Estar 🌿`
+    : `Oi ${first}! Aqui é a Thamiris do Bem Estar 🌿 Tudo bem?`;
+  window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+// ══════════════════════════════════════════
+//  OVERLAYS
+// ══════════════════════════════════════════
+function openOverlay(id)  { document.getElementById(id).classList.add('open'); }
+function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
+
+// ══════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+initHeader();
+buildDatalist();
+renderAgenda();
+</script>
+</body>
+</html>
