@@ -185,6 +185,8 @@ function ymLabel(ym){const[y,m]=ym.split("-");return new Date(Number(y),Number(m
 function mesVazio(ym){return{ym,saldoBase:0,gastos:[],fixas:[],fixasGlobaisPagas:[],fixasGlobaisValores:{},parcelasPagas:[],entradas:[]};}
 function dadosVazios(){return{meses:{},dividas:[],parcelamentos:[],investimentos:[],reservas:[],metas:[],contasFixasGlobais:[],catsCustom:[]};}
 function hashSenha(s){let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}return String(h);}
+function normalizarUsuario(v){return String(v||"").trim().toLowerCase();}
+function usuarioValido(v){return/^[a-z0-9._]{3,20}$/.test(normalizarUsuario(v));}
 function garantirMes(db,ym){return db.meses[ym]?db:{...db,meses:{...db.meses,[ym]:mesVazio(ym)}};}
 
 // ─── Contexto para ocultar valores ────────────────────────────────────────
@@ -258,7 +260,7 @@ async function dbCarregarPerfis(){
   if(error||!data)return[];
   return data
     .filter(r=>!r.nome.startsWith("__deleted__"))
-    .map(r=>({id:r.id,nome:r.nome,cor:r.cor,foto:r.foto,senhaHash:r.senha_hash,codigoRecuperacao:r.codigo_recuperacao}));
+    .map(r=>({id:r.id,nome:r.nome,username:r.username||"",cor:r.cor,foto:r.foto,senhaHash:r.senha_hash,codigoRecuperacao:r.codigo_recuperacao}));
 }
 async function dbSalvarPerfil(p){
   if(OFFLINE_MODE){
@@ -269,7 +271,7 @@ async function dbSalvarPerfil(p){
     localStorage.setItem(LS_PERFIS_KEY,JSON.stringify(perfis));
     return;
   }
-  await sb.from("perfis").upsert({id:p.id,nome:p.nome,cor:p.cor,foto:p.foto||null,senha_hash:p.senhaHash,codigo_recuperacao:p.codigoRecuperacao});
+  await sb.from("perfis").upsert({id:p.id,nome:p.nome,username:p.username||null,cor:p.cor,foto:p.foto||null,senha_hash:p.senhaHash,codigo_recuperacao:p.codigoRecuperacao});
 }
 async function dbDeletarPerfil(id){
   if(OFFLINE_MODE){
@@ -350,6 +352,11 @@ function useApp(){
   const[tela,setTela]=useState("loading");
   const saveTimer=useRef(null);
   const loadPerfilData=useCallback(async(p)=>{
+    if(!normalizarUsuario(p.username)){
+      setPerfil(p);
+      setTela("definir_usuario");
+      return;
+    }
     setTela("carregando_dados");
     const dados=await dbCarregarDados(p.id);
     const ym=ymNow();if(!dados.meses[ym])dados.meses[ym]=mesVazio(ym);
@@ -401,12 +408,19 @@ function useApp(){
     });
   },[perfil]);
 
-  const criarPerfil=useCallback(async(nome,senha,cor,foto)=>{
+  const usernameExiste=useCallback((username,ignoreId=null)=>{
+    const u=normalizarUsuario(username);
+    return perfis.some(p=>p.id!==ignoreId&&normalizarUsuario(p.username)===u);
+  },[perfis]);
+
+  const criarPerfil=useCallback(async(nome,username,senha,cor,foto)=>{
     const id=`u_${Date.now()}`;
     const cod=String(Math.floor(10000000+Math.random()*90000000));
-    const novo={id,nome,cor,foto:foto||null,senhaHash:hashSenha(senha),codigoRecuperacao:cod};
+    const u=normalizarUsuario(username);
+    if(!usuarioValido(u)||usernameExiste(u))return null;
+    const novo={id,nome,username:u,cor,foto:foto||null,senhaHash:hashSenha(senha),codigoRecuperacao:cod};
     await dbSalvarPerfil(novo);setPerfis(prev=>[...prev,novo]);setTela("perfis");return cod;
-  },[]);
+  },[usernameExiste]);
 
   const editarPerfil=useCallback(async(id,campos)=>{
     const lista=perfis.map(p=>p.id===id?{...p,...campos}:p);
@@ -437,11 +451,24 @@ function useApp(){
 
   const entrarComUsuarioSenha=useCallback(async(usuario,senha,lembrar=false)=>{
     const u=String(usuario||"").trim().toLowerCase();
-    const p=perfis.find(x=>String(x.nome||"").trim().toLowerCase()===u);
+    const p=perfis.find(x=>normalizarUsuario(x.username)===u);
     if(!p)return{ok:false,motivo:"usuario"};
     const ok=await entrar(p,senha,lembrar);
     return ok?{ok:true}:{ok:false,motivo:"senha"};
   },[perfis,entrar]);
+
+  const definirUsuarioAtual=useCallback(async(username)=>{
+    if(!perfil)return{ok:false,motivo:"sessao"};
+    const u=normalizarUsuario(username);
+    if(!usuarioValido(u))return{ok:false,motivo:"formato"};
+    if(usernameExiste(u,perfil.id))return{ok:false,motivo:"duplicado"};
+    const atualizado={...perfil,username:u};
+    await dbSalvarPerfil(atualizado);
+    setPerfis(prev=>prev.map(p=>p.id===atualizado.id?atualizado:p));
+    setPerfil(atualizado);
+    await loadPerfilData(atualizado);
+    return{ok:true};
+  },[perfil,usernameExiste,loadPerfilData]);
 
   const sair=useCallback(()=>{
     clearTimeout(saveTimer.current);
@@ -449,7 +476,7 @@ function useApp(){
     setPerfil(null);setDbRaw(dadosVazios());setTela("perfis");
   },[]);
 
-  return{tela,setTela,perfis,setPerfis,perfil,db,setDb,criarPerfil,editarPerfil,deletarPerfil,entrar,entrarBiometrico,entrarComUsuarioSenha,sair};
+  return{tela,setTela,perfis,setPerfis,perfil,db,setDb,criarPerfil,editarPerfil,deletarPerfil,entrar,entrarBiometrico,entrarComUsuarioSenha,definirUsuarioAtual,sair};
 }
 
 // ─── UI base ──────────────────────────────────────────────────────────────
@@ -541,6 +568,7 @@ function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
   const[lembrar,setLembrar]=useState(true);
   const[erro,setErro]=useState("");
   const[loading,setLoading]=useState(false);
+  const[mostrarPerfis,setMostrarPerfis]=useState(false);
   const tentarLogin=async()=>{
     if(!usuario||!senha||loading)return;
     setLoading(true);setErro("");
@@ -564,7 +592,7 @@ function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
     h("div",{style:{fontSize:22,fontWeight:800,color:C.text,marginBottom:4}},APP_NAME),
     h("div",{style:{fontSize:14,color:C.muted,marginBottom:20}},"Entre com usuário e senha"),
     h("div",{style:{width:"100%",maxWidth:340,marginBottom:24}},
-      h(Inp,{label:"Usuário",placeholder:"Nome do perfil",value:usuario,onChange:ev=>{setUsuario(ev.target.value);setErro("");}}),
+      h(Inp,{label:"Usuário",placeholder:"Seu nome de usuário",value:usuario,onChange:ev=>{setUsuario(ev.target.value);setErro("");}}),
       h(Inp,{label:"Senha",type:"password",placeholder:"Sua senha",value:senha,onChange:ev=>{setSenha(ev.target.value);setErro("");},onKeyDown:ev=>ev.key==="Enter"&&tentarLogin()}),
       h("label",{style:{display:"flex",alignItems:"center",gap:8,fontSize:13,color:C.muted,marginBottom:10,cursor:"pointer"}},
         h("input",{type:"checkbox",checked:lembrar,onChange:ev=>setLembrar(ev.target.checked)}),
@@ -573,8 +601,10 @@ function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
       erro&&h("div",{style:{fontSize:13,color:C.warn,marginBottom:8,textAlign:"center"}},erro),
       h(Btn,{onClick:tentarLogin,style:{marginTop:0}},loading?"Entrando...":"Entrar")
     ),
-    h("div",{style:{fontSize:13,color:C.muted,marginBottom:14}},"Ou escolha um perfil"),
-    h("div",{style:{display:"flex",flexWrap:"wrap",gap:24,justifyContent:"center",marginBottom:40,maxWidth:400}},
+    h("button",{onClick:()=>setMostrarPerfis(v=>!v),style:{background:"none",border:"none",color:C.muted,fontSize:13,marginBottom:14,cursor:"pointer",textDecoration:"underline"}},
+      mostrarPerfis?"Ocultar perfis":"Ou escolha um perfil"
+    ),
+    mostrarPerfis&&h("div",{style:{display:"flex",flexWrap:"wrap",gap:24,justifyContent:"center",marginBottom:40,maxWidth:400}},
       ...perfis.map(p=>h("div",{key:p.id,style:{display:"flex",flexDirection:"column",alignItems:"center",gap:10}},
         h(Avatar,{perfil:p,size:80,onClick:()=>onSelecionar(p)}),
         h("span",{style:{fontSize:13,fontWeight:600,color:C.text}},p.nome)
@@ -585,6 +615,34 @@ function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
         ),
         h("span",{style:{fontSize:13,color:C.muted}},"Novo perfil")
       )
+    )
+  );
+}
+
+function TelaDefinirUsuario({perfil,onSalvar,onSair}){
+  const[usuario,setUsuario]=useState("");
+  const[erro,setErro]=useState("");
+  const[loading,setLoading]=useState(false);
+  const salvar=async()=>{
+    if(loading)return;
+    setLoading(true);setErro("");
+    const res=await onSalvar(usuario);
+    if(!res?.ok){
+      const msg=res?.motivo==="duplicado"?"Esse nome de usuário já existe.":"Use 3 a 20 caracteres: letras minúsculas, números, ponto ou underline.";
+      setErro(msg);
+    }
+    setLoading(false);
+  };
+  return h("div",{style:{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 24px"}},
+    h(Avatar,{perfil,size:86,style:{marginBottom:16}}),
+    h("div",{style:{fontSize:20,fontWeight:800,color:C.text,marginBottom:8,textAlign:"center"}},"Crie seu nome de usuário"),
+    h("div",{style:{fontSize:13,color:C.muted,marginBottom:22,textAlign:"center",lineHeight:1.5}},"Olá, "+perfil.nome+". Defina um usuário único para seus próximos logins."),
+    h("div",{style:{width:"100%",maxWidth:340}},
+      h(Inp,{label:"Nome de usuário",placeholder:"ex: joao.silva",value:usuario,onChange:ev=>{setUsuario(ev.target.value);setErro("");}}),
+      h("div",{style:{fontSize:12,color:C.muted,marginBottom:12}},"Permitido: a-z, 0-9, ponto e underline."),
+      erro&&h("div",{style:{fontSize:13,color:C.warn,marginBottom:8,textAlign:"center"}},erro),
+      h(Btn,{onClick:salvar},loading?"Salvando...":"Salvar e entrar"),
+      h(Btn,{variant:"ghost",onClick:onSair,style:{marginTop:8}},"Sair")
     )
   );
 }
@@ -662,10 +720,18 @@ function TelaSenha({perfil,onEntrar,onEntrarBiometrico,onVoltar}){
 }
 
 function FormCriarPerfil({onSalvar,onCancelar}){
-  const[nome,setNome]=useState("");const[senha,setSenha]=useState("");const[cor,setCor]=useState(AVATAR_CORES[0]);
+  const[nome,setNome]=useState("");const[username,setUsername]=useState("");const[senha,setSenha]=useState("");const[cor,setCor]=useState(AVATAR_CORES[0]);
   const[foto,setFoto]=useState(null);const[erro,setErro]=useState("");const[codigo,setCodigo]=useState(null);const[loading,setLoading]=useState(false);
   const escolherFoto=ev=>{const f=ev.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=e=>setFoto(e.target.result);r.readAsDataURL(f);};
-  const salvar=async()=>{if(nome.trim().length<2){setErro("Nome precisa ter ao menos 2 letras.");return;}if(senha.length<4){setErro("Senha precisa ter ao menos 4 caracteres.");return;}setLoading(true);const cod=await onSalvar(nome.trim(),senha,cor,foto);if(cod)setCodigo(cod);setLoading(false);};
+  const salvar=async()=>{
+    if(nome.trim().length<2){setErro("Nome precisa ter ao menos 2 letras.");return;}
+    if(!usuarioValido(username)){setErro("Usuário inválido. Use 3-20 caracteres: a-z, 0-9, . ou _.");return;}
+    if(senha.length<4){setErro("Senha precisa ter ao menos 4 caracteres.");return;}
+    setLoading(true);
+    const cod=await onSalvar(nome.trim(),normalizarUsuario(username),senha,cor,foto);
+    if(cod)setCodigo(cod);else setErro("Nome de usuário já existe.");
+    setLoading(false);
+  };
   const preview={nome,cor,foto};
   if(codigo)return h("div",{style:{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 24px"}},
     h("div",{style:{fontSize:40,marginBottom:12}},"🔑"),
@@ -680,6 +746,7 @@ function FormCriarPerfil({onSalvar,onCancelar}){
     h("div",{style:{position:"relative",marginBottom:32}},h(Avatar,{perfil:preview,size:100}),h("label",{style:{position:"absolute",bottom:0,right:0,width:32,height:32,borderRadius:"50%",background:C.card,border:`2px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16}},"📷",h("input",{type:"file",accept:"image/*",onChange:escolherFoto,style:{display:"none"}}))),
     h("div",{style:{width:"100%",maxWidth:340}},
       h(Inp,{label:"Nome",placeholder:"Ex: João",value:nome,onChange:ev=>setNome(ev.target.value)}),
+      h(Inp,{label:"Nome de usuário",placeholder:"ex: joao.silva",value:username,onChange:ev=>setUsername(ev.target.value)}),
       h("div",{style:{marginBottom:14}},h("div",{style:{fontSize:12,color:C.muted,marginBottom:6,fontWeight:600}},"SENHA"),h("input",{type:"password",placeholder:"Mínimo 4 caracteres",value:senha,onChange:ev=>setSenha(ev.target.value),style:{width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:15,outline:"none",boxSizing:"border-box"}})),
       h("div",{style:{marginBottom:20}},h("div",{style:{fontSize:12,color:C.muted,marginBottom:10,fontWeight:600}},"COR DO AVATAR"),h("div",{style:{display:"flex",gap:10,flexWrap:"wrap"}},...AVATAR_CORES.map(cl=>h("button",{key:cl,onClick:()=>setCor(cl),style:{width:36,height:36,borderRadius:"50%",background:cl,border:`3px solid ${cor===cl?C.text:"transparent"}`,cursor:"pointer"}})))),
       erro&&h("div",{style:{color:C.warn,fontSize:13,marginBottom:12,textAlign:"center"}},erro),
@@ -1476,7 +1543,7 @@ function AppPrincipal({db,setDb,perfil,onSair,onEditarPerfil,onExcluirPerfil}){
 
 // ─── ROOT ──────────────────────────────────────────────────────────────────
 function App(){
-  const{tela,setTela,perfis,setPerfis,perfil,db,setDb,criarPerfil,editarPerfil,deletarPerfil,entrar,entrarBiometrico,entrarComUsuarioSenha,sair}=useApp();
+  const{tela,setTela,perfis,setPerfis,perfil,db,setDb,criarPerfil,editarPerfil,deletarPerfil,entrar,entrarBiometrico,entrarComUsuarioSenha,definirUsuarioAtual,sair}=useApp();
   const[perfilSel,setPerfilSel]=useState(null);const[criando,setCriando]=useState(false);
   const[adminAberto,setAdminAberto]=useState(false);
   if(adminAberto)return h(TelaAdmin,{perfis,onFechar:()=>setAdminAberto(false)});
@@ -1491,9 +1558,10 @@ function App(){
       "Tentar novamente"
     )
   );
-  if(criando)return h(FormCriarPerfil,{onSalvar:async(nome,senha,cor,foto)=>{const cod=await criarPerfil(nome,senha,cor,foto);return cod;},onCancelar:()=>setCriando(false)});
+  if(criando)return h(FormCriarPerfil,{onSalvar:async(nome,username,senha,cor,foto)=>{const cod=await criarPerfil(nome,username,senha,cor,foto);return cod;},onCancelar:()=>setCriando(false)});
   if(tela==="criar"||tela==="perfis")return h(TelaPerfis,{perfis,onSelecionar:p=>{setPerfilSel(p);setTela("senha");},onCriar:()=>setCriando(true),onAdmin:()=>setAdminAberto(true),onLoginCredenciais:entrarComUsuarioSenha});
   if(tela==="senha"&&perfilSel)return h(TelaSenha,{perfil:perfilSel,onEntrar:entrar,onEntrarBiometrico:entrarBiometrico,onVoltar:()=>{setPerfilSel(null);setTela("perfis");}});
+  if(tela==="definir_usuario"&&perfil)return h(TelaDefinirUsuario,{perfil,onSalvar:definirUsuarioAtual,onSair:sair});
   if(tela==="app"&&perfil)return h(AppPrincipal,{db,setDb,perfil,onSair:sair,onEditarPerfil:campos=>editarPerfil(perfil.id,campos),onExcluirPerfil:deletarPerfil});
   return h(TelaPerfis,{perfis,onSelecionar:p=>{setPerfilSel(p);setTela("senha");},onCriar:()=>setCriando(true),onAdmin:()=>setAdminAberto(true),onLoginCredenciais:entrarComUsuarioSenha});
 }
