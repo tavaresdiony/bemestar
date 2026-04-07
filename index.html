@@ -181,6 +181,7 @@ const sb=OFFLINE_MODE?null:supabase.createClient(SUPA_URL,SUPA_KEY);
 const LS_PERFIS_KEY=`${APP_PREFIX}_offline_perfis`;
 const LS_DADOS_KEY=`${APP_PREFIX}_offline_dados_por_perfil`;
 const LS_AUTH_KEY=`${APP_PREFIX}_auth_session`;
+const LS_USAGE_KEY=`${APP_PREFIX}_usage_stats`;
 
 // ─── Paleta ────────────────────────────────────────────────────────────────
 const C={bg:"#0D0D0F",card:"#161618",border:"#222226",accent:"#00E5A0",accentDim:"#00E5A015",warn:"#FF6B35",warnDim:"#FF6B3515",info:"#5B8DEF",infoDim:"#5B8DEF15",gold:"#FFD166",goldDim:"#FFD16615",green:"#22C55E",greenDim:"#22C55E15",purple:"#A855F7",purpleDim:"#A855F715",text:"#F2F2F4",muted:"#6B6B7A",subtle:"#2A2A30"};
@@ -268,11 +269,26 @@ async function dbCarregarPerfis(){
       return Array.isArray(list)?list:[];
     }catch{return[];}
   }
-  const{data,error}=await sb.from("perfis").select("id,nome,cor,foto,senha_hash,codigo_recuperacao");
+  const{data,error}=await sb.from("perfis").select("id,nome,username,cor,foto,senha_hash,codigo_recuperacao");
   if(error||!data)return[];
   return data
     .filter(r=>!r.nome.startsWith("__deleted__"))
     .map(r=>({id:r.id,nome:r.nome,username:r.username||"",cor:r.cor,foto:r.foto,senhaHash:r.senha_hash,codigoRecuperacao:r.codigo_recuperacao}));
+}
+function registrarUsoPerfil(perfilId){
+  try{
+    const raw=localStorage.getItem(LS_USAGE_KEY);
+    const usage=raw?JSON.parse(raw):{};
+    const prev=usage[perfilId]||{acessos:0};
+    usage[perfilId]={acessos:(prev.acessos||0)+1,ultimoAcesso:new Date().toISOString()};
+    localStorage.setItem(LS_USAGE_KEY,JSON.stringify(usage));
+  }catch{}
+}
+function carregarUsoPerfis(){
+  try{
+    const raw=localStorage.getItem(LS_USAGE_KEY);
+    return raw?JSON.parse(raw):{};
+  }catch{return{};}
 }
 async function dbSalvarPerfil(p){
   if(OFFLINE_MODE){
@@ -372,6 +388,7 @@ function useApp(){
     setTela("carregando_dados");
     const dados=await dbCarregarDados(p.id);
     const ym=ymNow();if(!dados.meses[ym])dados.meses[ym]=mesVazio(ym);
+    registrarUsoPerfil(p.id);
     setDbRaw(dados);setPerfil(p);setTela("app");
   },[]);
 
@@ -461,13 +478,19 @@ function useApp(){
     return true;
   },[loadPerfilData]);
 
-  const entrarComUsuarioSenha=useCallback(async(usuario,senha,lembrar=false)=>{
+  const entrarComUsuarioSenha=useCallback(async(usuario,senha,lembrar=false,opts={})=>{
+    if(opts?.biometric&&opts?.perfilId){
+      const p=perfis.find(x=>x.id===opts.perfilId);
+      if(!p)return{ok:false,motivo:"usuario"};
+      const ok=await entrarBiometrico(p);
+      return ok?{ok:true}:{ok:false,motivo:"biometria"};
+    }
     const u=String(usuario||"").trim().toLowerCase();
     const p=perfis.find(x=>normalizarUsuario(x.username)===u);
     if(!p)return{ok:false,motivo:"usuario"};
     const ok=await entrar(p,senha,lembrar);
     return ok?{ok:true}:{ok:false,motivo:"senha"};
-  },[perfis,entrar]);
+  },[perfis,entrar,entrarBiometrico]);
 
   const definirUsuarioAtual=useCallback(async(username)=>{
     if(!perfil)return{ok:false,motivo:"sessao"};
@@ -581,12 +604,27 @@ function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
   const[erro,setErro]=useState("");
   const[loading,setLoading]=useState(false);
   const[mostrarPerfis,setMostrarPerfis]=useState(false);
+  const[perfilBio,setPerfilBio]=useState("");
+  const[bioDisp,setBioDisp]=useState(false);
+  const[bioLoading,setBioLoading]=useState(false);
+  const perfisComBio=perfis.filter(p=>temBiometrico(p.id));
+  useEffect(()=>{biometricDisponivel().then(ok=>setBioDisp(ok));},[]);
+  useEffect(()=>{if(!perfilBio&&perfisComBio.length)setPerfilBio(perfisComBio[0].id);},[perfisComBio.length,perfilBio]);
   const tentarLogin=async()=>{
     if(!usuario||!senha||loading)return;
     setLoading(true);setErro("");
     const res=await onLoginCredenciais(usuario,senha,lembrar);
     if(!res?.ok)setErro(res?.motivo==="usuario"?"Usuário não encontrado.":"Senha incorreta.");
     setLoading(false);
+  };
+  const tentarBioInicial=async()=>{
+    if(!perfilBio||bioLoading)return;
+    const p=perfis.find(x=>x.id===perfilBio);
+    if(!p)return;
+    setBioLoading(true);setErro("");
+    const res=await onLoginCredenciais(normalizarUsuario(p.username),null,true,{biometric:true,perfilId:p.id});
+    if(!res?.ok)setErro("Não foi possível autenticar com Face ID.");
+    setBioLoading(false);
   };
   return h("div",{style:{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 24px",position:"relative"}},
     // Botão admin discreto no canto superior direito
@@ -612,6 +650,15 @@ function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
       ),
       erro&&h("div",{style:{fontSize:13,color:C.warn,marginBottom:8,textAlign:"center"}},erro),
       h(Btn,{onClick:tentarLogin,style:{marginTop:0}},loading?"Entrando...":"Entrar")
+    ),
+    bioDisp&&perfisComBio.length>0&&h("div",{style:{width:"100%",maxWidth:340,marginBottom:16}},
+      h(Sel,{label:"Entrar com Face ID",value:perfilBio,onChange:ev=>setPerfilBio(ev.target.value)},
+        perfisComBio.map(p=>h("option",{key:p.id,value:p.id},p.nome))
+      ),
+      h(Btn,{onClick:tentarBioInicial,style:{marginTop:0,background:C.infoDim,color:C.info,border:`1px solid ${C.info}`}},
+        h(Icon,{name:"faceId",size:16,color:C.info}),
+        bioLoading?"Aguardando...":"Entrar com Face ID"
+      )
     ),
     h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:10,marginBottom:18}},
       h("button",{onClick:onCriar,style:{width:72,height:72,borderRadius:"50%",border:`2px dashed ${C.border}`,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}},
@@ -1385,6 +1432,7 @@ Esta ação não pode ser desfeita.`)){
 
 // ─── PAINEL ADMIN ─────────────────────────────────────────────────────────────
 const ADMIN_SENHA=APP.adminPassword; // ← troque em APP_CONFIGS quando quiser
+const ADMIN_SENHAS_COMPATIVEIS=["acue2024admin","bemestar2026admin"];
 
 function TelaAdmin({perfis,onFechar}){
   const[autenticado,setAutenticado]=useState(false);
@@ -1394,7 +1442,7 @@ function TelaAdmin({perfis,onFechar}){
   const[loading,setLoading]=useState(false);
 
   const entrar=()=>{
-    if(senha===ADMIN_SENHA){setAutenticado(true);carregarStats();}
+    if(senha===ADMIN_SENHA||ADMIN_SENHAS_COMPATIVEIS.includes(senha)){setAutenticado(true);carregarStats();}
     else{setErro(true);setSenha("");}
   };
 
@@ -1402,6 +1450,7 @@ function TelaAdmin({perfis,onFechar}){
     setLoading(true);
     try{
       let dadosList=[];
+      const usageMap=carregarUsoPerfis();
       if(OFFLINE_MODE){
         const raw=localStorage.getItem(LS_DADOS_KEY);
         const all=raw?JSON.parse(raw):{};
@@ -1414,8 +1463,10 @@ function TelaAdmin({perfis,onFechar}){
         const d=dadosList?.find(x=>x.perfil_id===p.id);
         const dados=d?.dados||{};
         const meses=Object.keys(dados.meses||{}).length;
-        const ultimoAcesso=d?.atualizado_em?new Date(d.atualizado_em).toLocaleDateString("pt-BR"):"-";
-        return{id:p.id,nome:p.nome,meses,ultimoAcesso,ativo:meses>0};
+        const uso=usageMap[p.id]||{};
+        const ultimoFonte=uso.ultimoAcesso||d?.atualizado_em||null;
+        const ultimoAcesso=ultimoFonte?new Date(ultimoFonte).toLocaleString("pt-BR"):"-";
+        return{id:p.id,nome:p.nome,username:p.username||"-",meses,acessos:uso.acessos||0,ultimoAcesso,ativo:meses>0||!!ultimoFonte};
       });
       setStats(statsArr);
     }catch(e){console.error(e);}
@@ -1470,8 +1521,9 @@ function TelaAdmin({perfis,onFechar}){
             h("div",{style:{width:10,height:10,borderRadius:"50%",flexShrink:0,background:s.ativo?C.accent:C.subtle}}),
             h("div",{style:{flex:1}},
               h("div",{style:{fontSize:14,fontWeight:600}},s.nome),
+              h("div",{style:{fontSize:11,color:C.info,marginTop:2}},`@${s.username}`),
               h("div",{style:{fontSize:12,color:C.muted,marginTop:2}},
-                s.ativo?`${s.meses} mês(es) registrado(s) · último acesso: ${s.ultimoAcesso}`:"Sem dados ainda"
+                s.ativo?`${s.meses} mês(es) registrado(s) · acessos: ${s.acessos} · último acesso: ${s.ultimoAcesso}`:"Sem dados ainda"
               )
             ),
             s.ativo&&h("span",{style:{background:C.accentDim,borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,color:C.accent}},"ativo")
