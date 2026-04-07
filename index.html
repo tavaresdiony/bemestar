@@ -182,6 +182,8 @@ const LS_PERFIS_KEY=`${APP_PREFIX}_offline_perfis`;
 const LS_DADOS_KEY=`${APP_PREFIX}_offline_dados_por_perfil`;
 const LS_AUTH_KEY=`${APP_PREFIX}_auth_session`;
 const LS_USAGE_KEY=`${APP_PREFIX}_usage_stats`;
+const LS_LAST_BIO_KEY=`${APP_PREFIX}_last_bio_profile`;
+const LS_ADMIN_PRIVACY_KEY=`${APP_PREFIX}_admin_aggregate_only`;
 
 // ─── Paleta ────────────────────────────────────────────────────────────────
 const C={bg:"#0D0D0F",card:"#161618",border:"#222226",accent:"#00E5A0",accentDim:"#00E5A015",warn:"#FF6B35",warnDim:"#FF6B3515",info:"#5B8DEF",infoDim:"#5B8DEF15",gold:"#FFD166",goldDim:"#FFD16615",green:"#22C55E",greenDim:"#22C55E15",purple:"#A855F7",purpleDim:"#A855F715",text:"#F2F2F4",muted:"#6B6B7A",subtle:"#2A2A30"};
@@ -275,20 +277,39 @@ async function dbCarregarPerfis(){
     .filter(r=>!r.nome.startsWith("__deleted__"))
     .map(r=>({id:r.id,nome:r.nome,username:r.username||"",cor:r.cor,foto:r.foto,senhaHash:r.senha_hash,codigoRecuperacao:r.codigo_recuperacao}));
 }
+function dayKey(){return new Date().toISOString().slice(0,10);}
+function carregarUso(){
+  try{
+    const raw=localStorage.getItem(LS_USAGE_KEY);
+    return raw?JSON.parse(raw):{profiles:{},daily:{},tabViews:{}};
+  }catch{return{profiles:{},daily:{},tabViews:{}};}
+}
+function salvarUso(usage){localStorage.setItem(LS_USAGE_KEY,JSON.stringify(usage));}
 function registrarUsoPerfil(perfilId){
   try{
-    const raw=localStorage.getItem(LS_USAGE_KEY);
-    const usage=raw?JSON.parse(raw):{};
-    const prev=usage[perfilId]||{acessos:0};
-    usage[perfilId]={acessos:(prev.acessos||0)+1,ultimoAcesso:new Date().toISOString()};
-    localStorage.setItem(LS_USAGE_KEY,JSON.stringify(usage));
+    const usage=carregarUso();
+    const prev=usage.profiles?.[perfilId]||{acessos:0};
+    usage.profiles=usage.profiles||{};
+    usage.profiles[perfilId]={acessos:(prev.acessos||0)+1,ultimoAcesso:new Date().toISOString()};
+    salvarUso(usage);
   }catch{}
 }
-function carregarUsoPerfis(){
+function registrarEventoDiario(chave){
   try{
-    const raw=localStorage.getItem(LS_USAGE_KEY);
-    return raw?JSON.parse(raw):{};
-  }catch{return{};}
+    const usage=carregarUso();
+    usage.daily=usage.daily||{};
+    usage.daily[dayKey()]=usage.daily[dayKey()]||{};
+    usage.daily[dayKey()][chave]=(usage.daily[dayKey()][chave]||0)+1;
+    salvarUso(usage);
+  }catch{}
+}
+function registrarUsoAba(abaId){
+  try{
+    const usage=carregarUso();
+    usage.tabViews=usage.tabViews||{};
+    usage.tabViews[abaId]=(usage.tabViews[abaId]||0)+1;
+    salvarUso(usage);
+  }catch{}
 }
 async function dbSalvarPerfil(p){
   if(OFFLINE_MODE){
@@ -463,7 +484,11 @@ function useApp(){
   },[]);
 
   const entrar=useCallback(async(p,senha,lembrar=false)=>{
-    if(hashSenha(senha)!==p.senhaHash)return false;
+    if(hashSenha(senha)!==p.senhaHash){
+      registrarEventoDiario("loginFalha");
+      return false;
+    }
+    registrarEventoDiario("loginSucesso");
     if(lembrar)localStorage.setItem(LS_AUTH_KEY,JSON.stringify({perfilId:p.id,at:new Date().toISOString()}));
     else localStorage.removeItem(LS_AUTH_KEY);
     await loadPerfilData(p);
@@ -472,7 +497,12 @@ function useApp(){
 
   const entrarBiometrico=useCallback(async(p)=>{
     const ok=await autenticarBiometrico(p.id);
-    if(!ok)return false;
+    if(!ok){
+      registrarEventoDiario("bioFalha");
+      return false;
+    }
+    registrarEventoDiario("bioSucesso");
+    localStorage.setItem(LS_LAST_BIO_KEY,p.id);
     localStorage.setItem(LS_AUTH_KEY,JSON.stringify({perfilId:p.id,at:new Date().toISOString()}));
     await loadPerfilData(p);
     return true;
@@ -604,12 +634,11 @@ function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
   const[erro,setErro]=useState("");
   const[loading,setLoading]=useState(false);
   const[mostrarPerfis,setMostrarPerfis]=useState(false);
-  const[perfilBio,setPerfilBio]=useState("");
   const[bioDisp,setBioDisp]=useState(false);
   const[bioLoading,setBioLoading]=useState(false);
+  const[mostrarBioFallback,setMostrarBioFallback]=useState(false);
   const perfisComBio=perfis.filter(p=>temBiometrico(p.id));
   useEffect(()=>{biometricDisponivel().then(ok=>setBioDisp(ok));},[]);
-  useEffect(()=>{if(!perfilBio&&perfisComBio.length)setPerfilBio(perfisComBio[0].id);},[perfisComBio.length,perfilBio]);
   const tentarLogin=async()=>{
     if(!usuario||!senha||loading)return;
     setLoading(true);setErro("");
@@ -617,14 +646,20 @@ function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
     if(!res?.ok)setErro(res?.motivo==="usuario"?"Usuário não encontrado.":"Senha incorreta.");
     setLoading(false);
   };
-  const tentarBioInicial=async()=>{
-    if(!perfilBio||bioLoading)return;
-    const p=perfis.find(x=>x.id===perfilBio);
-    if(!p)return;
+  const tentarBioPerfil=async(p)=>{
+    if(!p||bioLoading)return false;
     setBioLoading(true);setErro("");
     const res=await onLoginCredenciais(normalizarUsuario(p.username),null,true,{biometric:true,perfilId:p.id});
     if(!res?.ok)setErro("Não foi possível autenticar com Face ID.");
     setBioLoading(false);
+    return!!res?.ok;
+  };
+  const tentarBioInicial=async()=>{
+    if(bioLoading||!perfisComBio.length)return;
+    const lastId=localStorage.getItem(LS_LAST_BIO_KEY);
+    const preferido=perfisComBio.find(p=>p.id===lastId)||perfisComBio[0];
+    const ok=await tentarBioPerfil(preferido);
+    if(!ok)setMostrarBioFallback(true);
   };
   return h("div",{style:{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 24px",position:"relative"}},
     // Botão admin discreto no canto superior direito
@@ -652,12 +687,18 @@ function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
       h(Btn,{onClick:tentarLogin,style:{marginTop:0}},loading?"Entrando...":"Entrar")
     ),
     bioDisp&&perfisComBio.length>0&&h("div",{style:{width:"100%",maxWidth:340,marginBottom:16}},
-      h(Sel,{label:"Entrar com Face ID",value:perfilBio,onChange:ev=>setPerfilBio(ev.target.value)},
-        perfisComBio.map(p=>h("option",{key:p.id,value:p.id},p.nome))
-      ),
       h(Btn,{onClick:tentarBioInicial,style:{marginTop:0,background:C.infoDim,color:C.info,border:`1px solid ${C.info}`}},
         h(Icon,{name:"faceId",size:16,color:C.info}),
         bioLoading?"Aguardando...":"Entrar com Face ID"
+      ),
+      h("button",{onClick:()=>setMostrarBioFallback(v=>!v),style:{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer",textDecoration:"underline",width:"100%",marginTop:6}},
+        mostrarBioFallback?"Ocultar escolha de perfil":"Usar outro perfil com Face ID"
+      ),
+      mostrarBioFallback&&h("div",{style:{display:"flex",flexWrap:"wrap",gap:12,justifyContent:"center",marginTop:10}},
+        ...perfisComBio.map(p=>h("button",{key:p.id,onClick:()=>tentarBioPerfil(p),style:{background:"transparent",border:`1px solid ${C.border}`,borderRadius:14,padding:"8px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",minWidth:84}},
+          h(Avatar,{perfil:p,size:44}),
+          h("span",{style:{fontSize:11,color:C.muted,marginTop:6,maxWidth:70,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},p.nome)
+        ))
       )
     ),
     h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:10,marginBottom:18}},
@@ -1440,6 +1481,8 @@ function TelaAdmin({perfis,onFechar}){
   const[erro,setErro]=useState(false);
   const[stats,setStats]=useState([]);
   const[loading,setLoading]=useState(false);
+  const[metrics,setMetrics]=useState({ativosHoje:0,ativos7d:0,ativos30d:0,sessoes30d:0,loginTaxa:0,bioTaxa:0,topAbas:[]});
+  const[aggregateOnly,setAggregateOnly]=useState(localStorage.getItem(LS_ADMIN_PRIVACY_KEY)!=="false");
 
   const entrar=()=>{
     if(senha===ADMIN_SENHA||ADMIN_SENHAS_COMPATIVEIS.includes(senha)){setAutenticado(true);carregarStats();}
@@ -1450,7 +1493,10 @@ function TelaAdmin({perfis,onFechar}){
     setLoading(true);
     try{
       let dadosList=[];
-      const usageMap=carregarUsoPerfis();
+      const usage=carregarUso();
+      const usageMap=usage.profiles||{};
+      const daily=usage.daily||{};
+      const tabViews=usage.tabViews||{};
       if(OFFLINE_MODE){
         const raw=localStorage.getItem(LS_DADOS_KEY);
         const all=raw?JSON.parse(raw):{};
@@ -1469,6 +1515,23 @@ function TelaAdmin({perfis,onFechar}){
         return{id:p.id,nome:p.nome,username:p.username||"-",meses,acessos:uso.acessos||0,ultimoAcesso,ativo:meses>0||!!ultimoFonte};
       });
       setStats(statsArr);
+      const now=Date.now();
+      const dayMs=86400000;
+      const ativosHoje=statsArr.filter(s=>usageMap[s.id]?.ultimoAcesso&&(now-new Date(usageMap[s.id].ultimoAcesso).getTime())<dayMs).length;
+      const ativos7d=statsArr.filter(s=>usageMap[s.id]?.ultimoAcesso&&(now-new Date(usageMap[s.id].ultimoAcesso).getTime())<7*dayMs).length;
+      const ativos30d=statsArr.filter(s=>usageMap[s.id]?.ultimoAcesso&&(now-new Date(usageMap[s.id].ultimoAcesso).getTime())<30*dayMs).length;
+      const dias30=Object.keys(daily).filter(d=>(now-new Date(d+"T00:00:00").getTime())<30*dayMs);
+      const soma=(k)=>dias30.reduce((acc,d)=>acc+Number(daily[d]?.[k]||0),0);
+      const loginSucesso=soma("loginSucesso"),loginFalha=soma("loginFalha");
+      const bioSucesso=soma("bioSucesso"),bioFalha=soma("bioFalha");
+      const sessoes30d=statsArr.reduce((acc,s)=>acc+Number(s.acessos||0),0);
+      const topAbas=Object.entries(tabViews).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      setMetrics({
+        ativosHoje,ativos7d,ativos30d,sessoes30d,
+        loginTaxa:(loginSucesso+loginFalha)?Math.round((loginSucesso/(loginSucesso+loginFalha))*100):0,
+        bioTaxa:(bioSucesso+bioFalha)?Math.round((bioSucesso/(bioSucesso+bioFalha))*100):0,
+        topAbas
+      });
     }catch(e){console.error(e);}
     setLoading(false);
   };
@@ -1513,15 +1576,47 @@ function TelaAdmin({perfis,onFechar}){
           h("div",{style:{fontSize:28,fontWeight:800,color:C.info}},loading?"...":stats.filter(s=>s.ativo).length)
         )
       ),
+      h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}},
+        h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14}},
+          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}},"ATIVOS"),
+          h("div",{style:{fontSize:12,color:C.text}},`Hoje: ${metrics.ativosHoje} | 7d: ${metrics.ativos7d} | 30d: ${metrics.ativos30d}`)
+        ),
+        h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14}},
+          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}},"TAXAS DE ACESSO"),
+          h("div",{style:{fontSize:12,color:C.text}},`Login: ${metrics.loginTaxa}% | Face ID: ${metrics.bioTaxa}%`)
+        )
+      ),
+      h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}},
+        h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14}},
+          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}},"ONBOARDING"),
+          h("div",{style:{fontSize:12,color:C.text}},`Username definido: ${perfis.filter(p=>normalizarUsuario(p.username)).length}/${perfis.length}`)
+        ),
+        h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14}},
+          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}},"BIOMETRIA"),
+          h("div",{style:{fontSize:12,color:C.text}},`Face ID ativo: ${perfis.filter(p=>temBiometrico(p.id)).length}/${perfis.length}`)
+        )
+      ),
+      h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14,marginBottom:12}},
+        h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:6}},"ABAS MAIS USADAS"),
+        metrics.topAbas.length
+          ?metrics.topAbas.map(([aba,qtd])=>h("div",{key:aba,style:{fontSize:12,color:C.text,marginBottom:4}},`${aba}: ${qtd}`))
+          :h("div",{style:{fontSize:12,color:C.muted}},"Sem dados ainda")
+      ),
+      h("div",{style:{background:C.infoDim,border:`1px solid ${C.info}`,borderRadius:12,padding:"10px 12px",marginBottom:12,fontSize:12,color:C.info}},
+        "Painel de uso sem dados financeiros: apenas métricas de acesso e navegação."
+      ),
+      h("label",{style:{display:"flex",alignItems:"center",gap:8,fontSize:12,color:C.muted,marginBottom:12,cursor:"pointer"}},
+        h("input",{type:"checkbox",checked:aggregateOnly,onChange:ev=>{const v=ev.target.checked;setAggregateOnly(v);localStorage.setItem(LS_ADMIN_PRIVACY_KEY,v?"true":"false");}}),
+        "Modo privacidade agregada (oculta lista por perfil)"
+      ),
       h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,letterSpacing:1,marginBottom:12}},"USUÁRIOS"),
       loading
         ?h("div",{style:{textAlign:"center",padding:32,color:C.muted}},"Carregando...")
-        :stats.map(s=>h("div",{key:s.id,style:{background:C.card,border:`1px solid ${C.border}`,
+        :!aggregateOnly&&stats.map((s,i)=>h("div",{key:s.id,style:{background:C.card,border:`1px solid ${C.border}`,
             borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}},
             h("div",{style:{width:10,height:10,borderRadius:"50%",flexShrink:0,background:s.ativo?C.accent:C.subtle}}),
             h("div",{style:{flex:1}},
-              h("div",{style:{fontSize:14,fontWeight:600}},s.nome),
-              h("div",{style:{fontSize:11,color:C.info,marginTop:2}},`@${s.username}`),
+              h("div",{style:{fontSize:14,fontWeight:600}},`Perfil #${i+1}`),
               h("div",{style:{fontSize:12,color:C.muted,marginTop:2}},
                 s.ativo?`${s.meses} mês(es) registrado(s) · acessos: ${s.acessos} · último acesso: ${s.ultimoAcesso}`:"Sem dados ainda"
               )
@@ -1556,6 +1651,7 @@ function AppPrincipal({db,setDb,perfil,onSair,onEditarPerfil,onExcluirPerfil}){
     hist:   h(Historico,   {db,setDb,setMes,setTab}),
   };
   const pwa=usePWAInstall();
+  useEffect(()=>{if(tab)registrarUsoAba(tab);},[tab]);
   return h(HiddenCtx.Provider,{value:{hidden,toggle:()=>setHidden(h=>!h)}},
     h("div",{style:{background:C.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto",color:C.text,paddingBottom:90}},
       h(PWABanner,{...pwa}),
