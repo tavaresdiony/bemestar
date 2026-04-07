@@ -145,6 +145,7 @@ const APP=APP_CONFIGS[APP_ID];
 const APP_NAME=APP.displayName;
 const APP_PREFIX=APP.storagePrefix;
 const APP_ENV_KEY=`${APP_PREFIX}_env`;
+const APP_MODE_KEY=`${APP_PREFIX}_run_mode`;
 function setBrandMetadata(name){
   document.title=name;
   const appMeta=document.querySelector('meta[name="application-name"]');
@@ -162,9 +163,20 @@ function getAppEnv(){
 const APP_ENV=getAppEnv();
 if(APP_ENV==="test"){localStorage.setItem(APP_ENV_KEY,"test");}
 if(APP_ENV==="prod"){localStorage.setItem(APP_ENV_KEY,"prod");}
-const OFFLINE_MODE=true; // prototipo local: sem conexao com banco externo
+function getRunMode(){
+  const qs=(new URLSearchParams(window.location.search).get("mode")||"").toLowerCase();
+  const fromStorage=(localStorage.getItem(APP_MODE_KEY)||"").toLowerCase();
+  const mode=(qs||fromStorage||"offline");
+  return mode==="online"?"online":"offline";
+}
+const RUN_MODE=getRunMode();
+localStorage.setItem(APP_MODE_KEY,RUN_MODE);
+const OFFLINE_MODE=RUN_MODE!=="online";
 const SUPA_URL=APP.supabase[APP_ENV].url;
 const SUPA_KEY=APP.supabase[APP_ENV].key;
+if(!OFFLINE_MODE&&(!SUPA_URL||!SUPA_KEY)){
+  throw new Error(`Modo online sem Supabase configurado para app '${APP_ID}' em '${APP_ENV}'.`);
+}
 const sb=OFFLINE_MODE?null:supabase.createClient(SUPA_URL,SUPA_KEY);
 const LS_PERFIS_KEY=`${APP_PREFIX}_offline_perfis`;
 const LS_DADOS_KEY=`${APP_PREFIX}_offline_dados_por_perfil`;
@@ -601,6 +613,12 @@ function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
       erro&&h("div",{style:{fontSize:13,color:C.warn,marginBottom:8,textAlign:"center"}},erro),
       h(Btn,{onClick:tentarLogin,style:{marginTop:0}},loading?"Entrando...":"Entrar")
     ),
+    h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:10,marginBottom:18}},
+      h("button",{onClick:onCriar,style:{width:72,height:72,borderRadius:"50%",border:`2px dashed ${C.border}`,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}},
+        h("span",{style:{fontSize:28,color:C.muted}},"+")
+      ),
+      h("span",{style:{fontSize:13,color:C.muted}},"Novo perfil")
+    ),
     h("button",{onClick:()=>setMostrarPerfis(v=>!v),style:{background:"none",border:"none",color:C.muted,fontSize:13,marginBottom:14,cursor:"pointer",textDecoration:"underline"}},
       mostrarPerfis?"Ocultar perfis":"Ou escolha um perfil"
     ),
@@ -608,13 +626,7 @@ function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
       ...perfis.map(p=>h("div",{key:p.id,style:{display:"flex",flexDirection:"column",alignItems:"center",gap:10}},
         h(Avatar,{perfil:p,size:80,onClick:()=>onSelecionar(p)}),
         h("span",{style:{fontSize:13,fontWeight:600,color:C.text}},p.nome)
-      )),
-      h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:10}},
-        h("button",{onClick:onCriar,style:{width:80,height:80,borderRadius:"50%",border:`2px dashed ${C.border}`,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}},
-          h("span",{style:{fontSize:32,color:C.muted}},"+")
-        ),
-        h("span",{style:{fontSize:13,color:C.muted}},"Novo perfil")
-      )
+      ))
     )
   );
 }
