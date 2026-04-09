@@ -1,1733 +1,1156 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="theme-color" content="#0D0D0F"/>
-  <title>Acué</title>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico"/>
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-512x512.png"/>
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"/>
-  <link rel="apple-touch-icon" href="/favicon-512x512.png"/>
-  <meta name="application-name" content="Acué"/>
-  <meta name="apple-mobile-web-app-title" content="Acué"/>
-  <style>
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
-    body{background:#0D0D0F;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;color:#F2F2F4}
-    #root{max-width:480px;margin:0 auto;min-height:100vh}
-    ::-webkit-scrollbar{display:none}
-    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+import { useState, useEffect, useRef } from “react”;
 
-    /* ── Loading animations ── */
-
-    /* Anel que se desenha em volta da logo (r=78 → circunferência ~490) */
-    @keyframes drawRing{
-      0%  {stroke-dashoffset:490;opacity:0}
-      8%  {opacity:1}
-      100%{stroke-dashoffset:0}
-    }
-    /* Logo entra com fade + scale */
-    @keyframes logoEnter{
-      0%  {opacity:0;transform:scale(0.75)}
-      65% {opacity:1;transform:scale(1.04)}
-      100%{opacity:1;transform:scale(1)}
-    }
-    /* Pulsação glow contínua */
-    @keyframes glowPulse{
-      0%,100%{filter:drop-shadow(0 0 12px #00E5A066)}
-      50%    {filter:drop-shadow(0 0 28px #00E5A0CC)}
-    }
-    /* Anel pulsa suavemente depois de completar */
-    @keyframes ringPulse{
-      0%,100%{filter:drop-shadow(0 0 4px #00E5A055)}
-      50%    {filter:drop-shadow(0 0 16px #00E5A0CC)}
-    }
-    /* Texto aparece */
-    @keyframes textEnter{
-      0%  {opacity:0;transform:translateY(6px)}
-      100%{opacity:1;transform:translateY(0)}
-    }
-    /* Fade out geral */
-    @keyframes fadeOut{0%{opacity:1}100%{opacity:0;visibility:hidden}}
-
-    /* Tela de loading */
-    .loading-wrap{
-      position:fixed;inset:0;background:#000;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      z-index:9999;
-    }
-    .loading-wrap.fade-out{animation:fadeOut 0.5s ease forwards}
-
-    /* Container relativo para logo + anel */
-    .lc-logo-wrap{
-      position:relative;
-      display:flex;align-items:center;justify-content:center;
-    }
-
-    /* Imagem da logo: entra com fade+scale, depois pulsa */
-    .lc-img{
-      animation:
-        logoEnter 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.1s both,
-        glowPulse 2.8s ease-in-out 1.5s infinite;
-      border-radius:50%;
-    }
-
-    /* Anel SVG animado: se desenha após a logo aparecer */
-    .lc-ring{pointer-events:none}
-    .lc-circle{
-      stroke-dasharray:490;
-      stroke-dashoffset:490;
-      animation:
-        drawRing 1.2s cubic-bezier(0.4,0,0.2,1) 0.6s both,
-        ringPulse 2.8s ease-in-out 2.2s infinite;
-    }
-
-    /* Texto ACUÉ */
-    .loading-text{
-      opacity:0;
-      animation:textEnter 0.5s ease 1.6s both;
-      font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-      color:#3a3a45;font-size:11px;margin-top:24px;
-      letter-spacing:5px;font-weight:700;
-    }
-    .val{transition:filter 0.2s}
-    .val.hidden{filter:blur(8px);user-select:none}
-  </style>
-</head>
-<body>
-<div id="root"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script>
-const{useState,useEffect,useCallback,useRef,createContext,useContext}=React;
-const h=React.createElement;
-const{Fragment}=React;
-
-// ─── Multi-app + Supabase (produção e teste) ───────────────────────────────
-const APP_CONFIGS={
-  acue:{
-    displayName:"Acué",
-    storagePrefix:"acue",
-    adminPassword:"acue2024admin",
-    supabase:{
-      prod:{
-        url:"https://dpnnfndouypmmrerannc.supabase.co",
-        key:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRwbm5mbmRvdXlwbW1yZXJhbm5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTU3ODQsImV4cCI6MjA5MDg5MTc4NH0.m8VgVvLeSnge8Z1tHoV0cqk_d1wbpPXLFH2XDevp_dI",
-      },
-      test:{url:"",key:""},
-    },
-  },
-  bemestar:{
-    displayName:"Bem Estar",
-    storagePrefix:"bemestar",
-    adminPassword:"bemestar2026admin",
-    supabase:{
-      // Preencha com o Supabase do app Bem Estar
-      prod:{url:"",key:""},
-      test:{url:"",key:""},
-    },
-  },
+/* ─── TOKENS ─────────────────────────────────────────────────── */
+const C = {
+bg:”#080808”, surface:”#111”, card:”#161616”, border:”#202020”,
+accent:”#FF6A00”, accentD:”#CC5200”, accentL:”#FF8C33”,
+green:”#22C55E”, red:”#EF4444”, blue:”#3B82F6”, yellow:”#F59E0B”,
+text:”#F0F0F0”, muted:”#555”, subtle:”#1A1A1A”,
 };
-function getAppId(){
-  const qsApp=(new URLSearchParams(window.location.search).get("app")||"").toLowerCase();
-  if(qsApp==="acue"||qsApp==="bemestar")return qsApp;
-  const host=(window.location.hostname||"").toLowerCase();
-  if(host.includes("bemestar")||host.includes("bem-estar"))return"bemestar";
-  return"acue";
-}
-const APP_ID=getAppId();
-const APP=APP_CONFIGS[APP_ID];
-const APP_NAME=APP.displayName;
-const APP_PREFIX=APP.storagePrefix;
-const APP_ENV_KEY=`${APP_PREFIX}_env`;
-const APP_MODE_KEY=`${APP_PREFIX}_run_mode`;
-function setBrandMetadata(name){
-  document.title=name;
-  const appMeta=document.querySelector('meta[name="application-name"]');
-  const appleTitleMeta=document.querySelector('meta[name="apple-mobile-web-app-title"]');
-  if(appMeta)appMeta.setAttribute("content",name);
-  if(appleTitleMeta)appleTitleMeta.setAttribute("content",name);
-}
-setBrandMetadata(APP_NAME);
-function getAppEnv(){
-  const qs=new URLSearchParams(window.location.search).get("env");
-  const fromStorage=localStorage.getItem(APP_ENV_KEY);
-  const env=(qs||fromStorage||"prod").toLowerCase();
-  return env==="test"?"test":"prod";
-}
-const APP_ENV=getAppEnv();
-if(APP_ENV==="test"){localStorage.setItem(APP_ENV_KEY,"test");}
-if(APP_ENV==="prod"){localStorage.setItem(APP_ENV_KEY,"prod");}
-function getRunMode(){
-  const qs=(new URLSearchParams(window.location.search).get("mode")||"").toLowerCase();
-  const fromStorage=(localStorage.getItem(APP_MODE_KEY)||"").toLowerCase();
-  const mode=(qs||fromStorage||"offline");
-  return mode==="online"?"online":"offline";
-}
-const RUN_MODE=getRunMode();
-localStorage.setItem(APP_MODE_KEY,RUN_MODE);
-const OFFLINE_MODE=RUN_MODE!=="online";
-const SUPA_URL=APP.supabase[APP_ENV].url;
-const SUPA_KEY=APP.supabase[APP_ENV].key;
-if(!OFFLINE_MODE&&(!SUPA_URL||!SUPA_KEY)){
-  throw new Error(`Modo online sem Supabase configurado para app '${APP_ID}' em '${APP_ENV}'.`);
-}
-const sb=OFFLINE_MODE?null:supabase.createClient(SUPA_URL,SUPA_KEY);
-const LS_PERFIS_KEY=`${APP_PREFIX}_offline_perfis`;
-const LS_DADOS_KEY=`${APP_PREFIX}_offline_dados_por_perfil`;
-const LS_AUTH_KEY=`${APP_PREFIX}_auth_session`;
-const LS_USAGE_KEY=`${APP_PREFIX}_usage_stats`;
-const LS_LAST_BIO_KEY=`${APP_PREFIX}_last_bio_profile`;
-const LS_ADMIN_PRIVACY_KEY=`${APP_PREFIX}_admin_aggregate_only`;
 
-// ─── Paleta ────────────────────────────────────────────────────────────────
-const C={bg:"#0D0D0F",card:"#161618",border:"#222226",accent:"#00E5A0",accentDim:"#00E5A015",warn:"#FF6B35",warnDim:"#FF6B3515",info:"#5B8DEF",infoDim:"#5B8DEF15",gold:"#FFD166",goldDim:"#FFD16615",green:"#22C55E",greenDim:"#22C55E15",purple:"#A855F7",purpleDim:"#A855F715",text:"#F2F2F4",muted:"#6B6B7A",subtle:"#2A2A30"};
-const CATS=["Alimentação","Transporte","Lazer","Saúde","Educação","Moradia","Vestuário"];
-const FCATS=["Aluguel","Internet","Streaming","Energia","Água","Gás","Telefone","Faculdade","Outros"];
-const AVATAR_CORES=["#00E5A0","#FF6B35","#5B8DEF","#FFD166","#C084FC","#F472B6","#E879F9","#FB923C"];
+/* ─── HORÁRIOS ───────────────────────────────────────────────── */
+const HORARIOS_SEMANA = [“05:30”,“06:30”,“07:30”,“12:00”,“16:30”,“17:30”,“18:30”,“19:30”,“20:30”];
+const HORARIOS_SEXTA  = [“05:30”,“06:30”,“07:30”,“12:00”,“16:30”,“17:30”,“18:30”,“19:30”];
+const DIAS = [“Seg”,“Ter”,“Qua”,“Qui”,“Sex”];
 
-const fmt=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-const toN=s=>parseFloat(String(s||"0").replace(",","."))||0;
-const todayStr=()=>new Date().toISOString().split("T")[0];
-const ymNow=()=>new Date().toISOString().slice(0,7);
-function ymAdd(ym,delta){const[y,m]=ym.split("-").map(Number);const d=new Date(y,m-1+delta,1);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;}
-function ymLabel(ym){const[y,m]=ym.split("-");return new Date(Number(y),Number(m)-1).toLocaleString("pt-BR",{month:"long",year:"numeric"});}
-function mesVazio(ym){return{ym,saldoBase:0,gastos:[],fixas:[],fixasGlobaisPagas:[],fixasGlobaisValores:{},parcelasPagas:[],entradas:[]};}
-function dadosVazios(){return{meses:{},dividas:[],parcelamentos:[],investimentos:[],reservas:[],metas:[],contasFixasGlobais:[],catsCustom:[]};}
-function hashSenha(s){let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}return String(h);}
-function normalizarUsuario(v){return String(v||"").trim().toLowerCase();}
-function usuarioValido(v){return/^[a-z0-9._]{3,20}$/.test(normalizarUsuario(v));}
-function garantirMes(db,ym){return db.meses[ym]?db:{...db,meses:{...db.meses,[ym]:mesVazio(ym)}};}
-
-// ─── Contexto para ocultar valores ────────────────────────────────────────
-const HiddenCtx=createContext({hidden:false,toggle:()=>{}});
-function useHidden(){return useContext(HiddenCtx);}
-
-// Componente que aplica blur quando oculto
-function Val({children,style={}}){
-  const{hidden}=useHidden();
-  return h("span",{className:hidden?"val hidden":"val",style},children);
-}
-
-// ─── Face ID / Biometria via WebAuthn ─────────────────────────────────────
-const BIOMETRIC_KEY=`${APP_PREFIX}_biometric_`;
-
-async function biometricDisponivel(){
-  try{return!!(window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());}catch{return false;}
-}
-
-// Registra credencial biométrica para o perfil
-async function registrarBiometrico(perfilId,perfilNome){
-  try{
-    const challenge=new Uint8Array(32);crypto.getRandomValues(challenge);
-    const userId=new TextEncoder().encode(perfilId);
-    const cred=await navigator.credentials.create({publicKey:{
-      challenge,rp:{name:APP_NAME,id:window.location.hostname||"localhost"},
-      user:{id:userId,name:perfilNome,displayName:perfilNome},
-      pubKeyCredParams:[{alg:-7,type:"public-key"},{alg:-257,type:"public-key"}],
-      authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required"},
-      timeout:60000,
-    }});
-    if(cred){
-      // Salva o ID da credencial para usar depois
-      const credId=btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
-      localStorage.setItem(BIOMETRIC_KEY+perfilId,credId);
-      return true;
-    }
-  }catch(e){console.log("Biometric register error:",e);}
-  return false;
-}
-
-// Autentica via biometria
-async function autenticarBiometrico(perfilId){
-  try{
-    const credIdStr=localStorage.getItem(BIOMETRIC_KEY+perfilId);
-    if(!credIdStr)return false;
-    const credIdBytes=Uint8Array.from(atob(credIdStr),c=>c.charCodeAt(0));
-    const challenge=new Uint8Array(32);crypto.getRandomValues(challenge);
-    const assertion=await navigator.credentials.get({publicKey:{
-      challenge,
-      allowCredentials:[{id:credIdBytes,type:"public-key",transports:["internal"]}],
-      userVerification:"required",
-      timeout:60000,
-    }});
-    return!!assertion;
-  }catch(e){console.log("Biometric auth error:",e);return false;}
-}
-
-function temBiometrico(perfilId){return!!localStorage.getItem(BIOMETRIC_KEY+perfilId);}
-
-// ─── Supabase helpers ──────────────────────────────────────────────────────
-async function dbCarregarPerfis(){
-  if(OFFLINE_MODE){
-    try{
-      const raw=localStorage.getItem(LS_PERFIS_KEY);
-      const list=raw?JSON.parse(raw):[];
-      return Array.isArray(list)?list:[];
-    }catch{return[];}
-  }
-  const{data,error}=await sb.from("perfis").select("id,nome,username,cor,foto,senha_hash,codigo_recuperacao");
-  if(error||!data)return[];
-  return data
-    .filter(r=>!r.nome.startsWith("__deleted__"))
-    .map(r=>({id:r.id,nome:r.nome,username:r.username||"",cor:r.cor,foto:r.foto,senhaHash:r.senha_hash,codigoRecuperacao:r.codigo_recuperacao}));
-}
-function dayKey(){return new Date().toISOString().slice(0,10);}
-function carregarUso(){
-  try{
-    const raw=localStorage.getItem(LS_USAGE_KEY);
-    return raw?JSON.parse(raw):{profiles:{},daily:{},tabViews:{}};
-  }catch{return{profiles:{},daily:{},tabViews:{}};}
-}
-function salvarUso(usage){localStorage.setItem(LS_USAGE_KEY,JSON.stringify(usage));}
-function registrarUsoPerfil(perfilId){
-  try{
-    const usage=carregarUso();
-    const prev=usage.profiles?.[perfilId]||{acessos:0};
-    usage.profiles=usage.profiles||{};
-    usage.profiles[perfilId]={acessos:(prev.acessos||0)+1,ultimoAcesso:new Date().toISOString()};
-    salvarUso(usage);
-  }catch{}
-}
-function registrarEventoDiario(chave){
-  try{
-    const usage=carregarUso();
-    usage.daily=usage.daily||{};
-    usage.daily[dayKey()]=usage.daily[dayKey()]||{};
-    usage.daily[dayKey()][chave]=(usage.daily[dayKey()][chave]||0)+1;
-    salvarUso(usage);
-  }catch{}
-}
-function registrarUsoAba(abaId){
-  try{
-    const usage=carregarUso();
-    usage.tabViews=usage.tabViews||{};
-    usage.tabViews[abaId]=(usage.tabViews[abaId]||0)+1;
-    salvarUso(usage);
-  }catch{}
-}
-async function dbSalvarPerfil(p){
-  if(OFFLINE_MODE){
-    const perfis=await dbCarregarPerfis();
-    const i=perfis.findIndex(x=>x.id===p.id);
-    const item={...p,foto:p.foto||null};
-    if(i>=0)perfis[i]=item;else perfis.push(item);
-    localStorage.setItem(LS_PERFIS_KEY,JSON.stringify(perfis));
-    return;
-  }
-  await sb.from("perfis").upsert({id:p.id,nome:p.nome,username:p.username||null,cor:p.cor,foto:p.foto||null,senha_hash:p.senhaHash,codigo_recuperacao:p.codigoRecuperacao});
-}
-async function dbDeletarPerfil(id){
-  if(OFFLINE_MODE){
-    const perfis=(await dbCarregarPerfis()).filter(p=>p.id!==id);
-    localStorage.setItem(LS_PERFIS_KEY,JSON.stringify(perfis));
-    try{
-      const raw=localStorage.getItem(LS_DADOS_KEY);
-      const all=raw?JSON.parse(raw):{};
-      delete all[id];
-      localStorage.setItem(LS_DADOS_KEY,JSON.stringify(all));
-    }catch{}
-    return;
-  }
-  await sb.from("perfis").update({nome:"__deleted__"+Date.now()}).eq("id",id);
-}
-async function dbCarregarDados(perfilId){
-  if(OFFLINE_MODE){
-    try{
-      const raw=localStorage.getItem(LS_DADOS_KEY);
-      const all=raw?JSON.parse(raw):{};
-      return all[perfilId]?{...dadosVazios(),...all[perfilId]}:dadosVazios();
-    }catch{return dadosVazios();}
-  }
-  const{data}=await sb.from("dados_financeiros").select("dados").eq("perfil_id",perfilId).single();
-  return data?{...dadosVazios(),...data.dados}:dadosVazios();
-}
-async function dbSalvarDados(perfilId,dados){
-  if(OFFLINE_MODE){
-    let all={};
-    try{
-      const raw=localStorage.getItem(LS_DADOS_KEY);
-      all=raw?JSON.parse(raw):{};
-    }catch{}
-    all[perfilId]=dados;
-    localStorage.setItem(LS_DADOS_KEY,JSON.stringify(all));
-    return;
-  }
-  await sb.from("dados_financeiros").upsert({perfil_id:perfilId,dados,atualizado_em:new Date().toISOString()});
-}
-
-// ─── PWA Install Prompt ───────────────────────────────────────────────────────
-const PWA_KEY=`${APP_PREFIX}_pwa_dismiss`;
-function usePWAInstall(){
-  const[prompt,setPrompt]=useState(null);
-  const[mostrar,setMostrar]=useState(false);
-  useEffect(()=>{
-    const dispensou=localStorage.getItem(PWA_KEY);
-    const standalone=window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone;
-    if(dispensou||standalone)return;
-    const handler=ev=>{ev.preventDefault();setPrompt(ev);setMostrar(true);};
-    window.addEventListener("beforeinstallprompt",handler);
-    return()=>window.removeEventListener("beforeinstallprompt",handler);
-  },[]);
-  const instalar=async()=>{if(!prompt)return;prompt.prompt();const{outcome}=await prompt.userChoice;if(outcome==="accepted")localStorage.setItem(PWA_KEY,"installed");setMostrar(false);setPrompt(null);};
-  const dispensar=()=>{localStorage.setItem(PWA_KEY,"dismissed");setMostrar(false);};
-  return{mostrar,instalar,dispensar};
-}
-function PWABanner({mostrar,instalar,dispensar}){
-  if(!mostrar)return null;
-  return h("div",{style:{position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",width:"calc(100% - 32px)",maxWidth:448,background:C.card,border:`1px solid ${C.accent}44`,borderRadius:16,padding:"16px 18px",zIndex:90,boxShadow:"0 8px 32px #000000AA",animation:"fadeIn 0.3s ease",display:"flex",alignItems:"center",gap:12}},
-    h("div",{style:{fontSize:28}},"📱"),
-    h("div",{style:{flex:1}},
-      h("div",{style:{fontSize:14,fontWeight:700,color:C.text,marginBottom:2}},"Adicionar à tela inicial"),
-      h("div",{style:{fontSize:12,color:C.muted}},`Acesse o ${APP_NAME} como um app, sem abrir o navegador.`)
-    ),
-    h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
-      h("button",{onClick:instalar,style:{background:C.accent,color:C.bg,border:"none",borderRadius:10,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}},"Instalar"),
-      h("button",{onClick:dispensar,style:{background:"none",border:"none",color:C.muted,fontSize:11,cursor:"pointer",textAlign:"center"}},"Não mostrar mais")
-    )
-  );
-}
-
-// ─── Hook principal ────────────────────────────────────────────────────────
-function useApp(){
-  const[perfis,setPerfis]=useState([]);
-  const[perfil,setPerfil]=useState(null);
-  const[db,setDbRaw]=useState(dadosVazios);
-  const[tela,setTela]=useState("loading");
-  const saveTimer=useRef(null);
-  const loadPerfilData=useCallback(async(p)=>{
-    if(!normalizarUsuario(p.username)){
-      setPerfil(p);
-      setTela("definir_usuario");
-      return;
-    }
-    setTela("carregando_dados");
-    const dados=await dbCarregarDados(p.id);
-    const ym=ymNow();if(!dados.meses[ym])dados.meses[ym]=mesVazio(ym);
-    registrarUsoPerfil(p.id);
-    setDbRaw(dados);setPerfil(p);setTela("app");
-  },[]);
-
-  useEffect(()=>{
-    const t0=Date.now();
-    dbCarregarPerfis().then(p=>{
-      // Animação mínima de 1.8s — mais curto para não frustrar se houver lentidão
-      const elapsed=Date.now()-t0;
-      const wait=Math.max(0,1800-elapsed);
-      setTimeout(()=>{
-        setPerfis(p);
-        if(p.length===0){setTela("criar");return;}
-        try{
-          const authRaw=localStorage.getItem(LS_AUTH_KEY);
-          const auth=authRaw?JSON.parse(authRaw):null;
-          const perfilSalvo=auth?.perfilId?p.find(x=>x.id===auth.perfilId):null;
-          if(perfilSalvo){loadPerfilData(perfilSalvo);return;}
-        }catch{}
-        setTela("perfis");
-      },wait);
-    }).catch(err=>{
-      console.error("Erro ao carregar perfis:",err);
-      // Tenta de novo uma vez antes de desistir
-      dbCarregarPerfis().then(p=>{
-        setPerfis(p);
-        if(p.length===0){setTela("criar");return;}
-        try{
-          const authRaw=localStorage.getItem(LS_AUTH_KEY);
-          const auth=authRaw?JSON.parse(authRaw):null;
-          const perfilSalvo=auth?.perfilId?p.find(x=>x.id===auth.perfilId):null;
-          if(perfilSalvo){loadPerfilData(perfilSalvo);return;}
-        }catch{}
-        setTela("perfis");
-      }).catch(()=>{
-        // Se falhar de novo, mostra tela de erro
-        setTela("erro_conexao");
-      });
-    });
-  },[loadPerfilData]);
-
-  const setDb=useCallback((next)=>{
-    setDbRaw(prev=>{
-      const val=typeof next==="function"?next(prev):next;
-      if(perfil){clearTimeout(saveTimer.current);saveTimer.current=setTimeout(()=>dbSalvarDados(perfil.id,val),1000);}
-      return val;
-    });
-  },[perfil]);
-
-  const usernameExiste=useCallback((username,ignoreId=null)=>{
-    const u=normalizarUsuario(username);
-    return perfis.some(p=>p.id!==ignoreId&&normalizarUsuario(p.username)===u);
-  },[perfis]);
-
-  const criarPerfil=useCallback(async(nome,username,senha,cor,foto)=>{
-    const id=`u_${Date.now()}`;
-    const cod=String(Math.floor(10000000+Math.random()*90000000));
-    const u=normalizarUsuario(username);
-    if(!usuarioValido(u)||usernameExiste(u))return null;
-    const novo={id,nome,username:u,cor,foto:foto||null,senhaHash:hashSenha(senha),codigoRecuperacao:cod};
-    await dbSalvarPerfil(novo);setPerfis(prev=>[...prev,novo]);setTela("perfis");return cod;
-  },[usernameExiste]);
-
-  const editarPerfil=useCallback(async(id,campos)=>{
-    const lista=perfis.map(p=>p.id===id?{...p,...campos}:p);
-    await dbSalvarPerfil(lista.find(p=>p.id===id));
-    setPerfis(lista);if(perfil?.id===id)setPerfil(prev=>({...prev,...campos}));
-  },[perfis,perfil]);
-
-  const deletarPerfil=useCallback(async(id)=>{
-    await dbDeletarPerfil(id);setPerfis(prev=>prev.filter(p=>p.id!==id));
-    localStorage.removeItem(BIOMETRIC_KEY+id);
-  },[]);
-
-  const entrar=useCallback(async(p,senha,lembrar=false)=>{
-    if(hashSenha(senha)!==p.senhaHash){
-      registrarEventoDiario("loginFalha");
-      return false;
-    }
-    registrarEventoDiario("loginSucesso");
-    if(lembrar)localStorage.setItem(LS_AUTH_KEY,JSON.stringify({perfilId:p.id,at:new Date().toISOString()}));
-    else localStorage.removeItem(LS_AUTH_KEY);
-    await loadPerfilData(p);
-    return true;
-  },[loadPerfilData]);
-
-  const entrarBiometrico=useCallback(async(p)=>{
-    const ok=await autenticarBiometrico(p.id);
-    if(!ok){
-      registrarEventoDiario("bioFalha");
-      return false;
-    }
-    registrarEventoDiario("bioSucesso");
-    localStorage.setItem(LS_LAST_BIO_KEY,p.id);
-    localStorage.setItem(LS_AUTH_KEY,JSON.stringify({perfilId:p.id,at:new Date().toISOString()}));
-    await loadPerfilData(p);
-    return true;
-  },[loadPerfilData]);
-
-  const entrarComUsuarioSenha=useCallback(async(usuario,senha,lembrar=false,opts={})=>{
-    if(opts?.biometric&&opts?.perfilId){
-      const p=perfis.find(x=>x.id===opts.perfilId);
-      if(!p)return{ok:false,motivo:"usuario"};
-      const ok=await entrarBiometrico(p);
-      return ok?{ok:true}:{ok:false,motivo:"biometria"};
-    }
-    const u=String(usuario||"").trim().toLowerCase();
-    const p=perfis.find(x=>normalizarUsuario(x.username)===u);
-    if(!p)return{ok:false,motivo:"usuario"};
-    const ok=await entrar(p,senha,lembrar);
-    return ok?{ok:true}:{ok:false,motivo:"senha"};
-  },[perfis,entrar,entrarBiometrico]);
-
-  const definirUsuarioAtual=useCallback(async(username)=>{
-    if(!perfil)return{ok:false,motivo:"sessao"};
-    const u=normalizarUsuario(username);
-    if(!usuarioValido(u))return{ok:false,motivo:"formato"};
-    if(usernameExiste(u,perfil.id))return{ok:false,motivo:"duplicado"};
-    const atualizado={...perfil,username:u};
-    await dbSalvarPerfil(atualizado);
-    setPerfis(prev=>prev.map(p=>p.id===atualizado.id?atualizado:p));
-    setPerfil(atualizado);
-    await loadPerfilData(atualizado);
-    return{ok:true};
-  },[perfil,usernameExiste,loadPerfilData]);
-
-  const sair=useCallback(()=>{
-    clearTimeout(saveTimer.current);
-    localStorage.removeItem(LS_AUTH_KEY);
-    setPerfil(null);setDbRaw(dadosVazios());setTela("perfis");
-  },[]);
-
-  return{tela,setTela,perfis,setPerfis,perfil,db,setDb,criarPerfil,editarPerfil,deletarPerfil,entrar,entrarBiometrico,entrarComUsuarioSenha,definirUsuarioAtual,sair};
-}
-
-// ─── UI base ──────────────────────────────────────────────────────────────
-function Card({children,style={},onClick}){return h("div",{onClick,style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16,marginBottom:12,cursor:onClick?"pointer":"default",...style}},children);}
-function Badge({label,color=C.accent}){return h("span",{style:{background:color+"22",color,fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:20}},label);}
-function Bar({value,max,color=C.accent}){const pct=Math.min(100,(value/(max||1))*100);const col=pct>80?C.warn:pct>60?C.gold:color;return h("div",{style:{background:C.subtle,borderRadius:99,height:6,overflow:"hidden",marginTop:8}},h("div",{style:{width:`${pct}%`,height:"100%",background:col,borderRadius:99,transition:"width 0.4s"}}));}
-function Modal({title,children,onClose}){
-  return h("div",{onClick:onClose,style:{position:"fixed",inset:0,background:"#000000CC",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}},
-    h("div",{onClick:ev=>ev.stopPropagation(),style:{background:C.card,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,padding:"24px 20px 40px",border:`1px solid ${C.border}`,animation:"slideUp .25s ease",maxHeight:"88vh",overflowY:"auto"}},
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}},h("span",{style:{fontWeight:700,fontSize:17,color:C.text}},title),h("button",{onClick:onClose,style:{background:C.subtle,border:"none",borderRadius:99,padding:"6px 10px",cursor:"pointer",color:C.muted}},"✕")),
-      children
-    )
-  );
-}
-function Inp({label,...p}){return h("div",{style:{marginBottom:14}},label&&h("div",{style:{fontSize:12,color:C.muted,marginBottom:6,fontWeight:600}},label),h("input",{...p,style:{width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:15,outline:"none",boxSizing:"border-box",...p.style}}));}
-function NInp({label,...p}){return h("div",{style:{marginBottom:14}},label&&h("div",{style:{fontSize:12,color:C.muted,marginBottom:6,fontWeight:600}},label),h("input",{inputMode:"decimal",pattern:"[0-9]*[.,]?[0-9]*",...p,style:{width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:15,outline:"none",boxSizing:"border-box",...p.style}}));}
-function Sel({label,children,...p}){return h("div",{style:{marginBottom:14}},label&&h("div",{style:{fontSize:12,color:C.muted,marginBottom:6,fontWeight:600}},label),h("select",{...p,style:{width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:15,outline:"none",boxSizing:"border-box",appearance:"none",...p.style}},children));}
-function Btn({children,onClick,variant="primary",small=false,style={}}){const bg=variant==="primary"?C.accent:variant==="danger"?C.warn:C.subtle;const color=variant==="ghost"?C.muted:C.bg;return h("button",{onClick,style:{background:bg,color,border:"none",borderRadius:12,padding:small?"8px 14px":"14px 20px",fontSize:small?13:15,fontWeight:700,cursor:"pointer",width:small?"auto":"100%",marginTop:small?0:6,display:"inline-flex",alignItems:"center",gap:6,justifyContent:"center",...style}},children);}
-
-// ─── Ícones ────────────────────────────────────────────────────────────────
-const ICONS={
-  home:"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10",
-  wallet:"M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z M16 3l-4 4-4-4",
-  trend:"M23 6l-9.5 9.5-5-5L1 18 M17 6h6v6",
-  target:"M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12z M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
-  plus:"M12 5v14 M5 12h14",check:"M20 6L9 17l-5-5",
-  alert:"M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01",
-  info:"M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 8h.01 M12 12v4",
-  trash:"M3 6h18 M8 6V4h8v2 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6",
-  edit:"M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
-  hist:"M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 6v6l4 2",
-  chevL:"M15 18l-6-6 6-6",chevR:"M9 18l6-6-6-6",
-  repeat:"M17 1l4 4-4 4 M3 11V9a4 4 0 0 1 4-4h14 M7 23l-4-4 4-4 M21 13v2a4 4 0 0 1-4 4H3",
-  logout:"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9",
-  split:"M16 3h5v5 M4 20L21 3 M21 16v5h-5 M15 15l6 6 M4 4l5 5",
-  eye:"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
-  eyeOff:"M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94 M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19 M1 1l22 22",
-  faceId:"M8 3H5a2 2 0 0 0-2 2v3 M21 8V5a2 2 0 0 0-2-2h-3 M3 16v3a2 2 0 0 0 2 2h3 M16 21h3a2 2 0 0 0 2-2v-3 M9 10h.01 M15 10h.01 M9.5 15a3.5 3.5 0 0 0 5 0",
-  card:"M1 4h22v4H1z M1 8v12a1 1 0 0 0 1 1h20a1 1 0 0 0 1-1V8H1z M1 12h22",
+const getDiaSemana = () => {
+const d = new Date().getDay();
+if(d===0||d===6) return null;
+if(d===5) return “Sex”;
+return DIAS[d-1];
 };
-function Icon({name,size=20,color=C.text}){return h("svg",{width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:color,strokeWidth:"1.8",strokeLinecap:"round",strokeLinejoin:"round"},(ICONS[name]||"").split(" M").map((d,i)=>h("path",{key:i,d:i===0?d:"M"+d})));}
-function Avatar({perfil,size=72,onClick,style={}}){const ini=perfil.nome.charAt(0).toUpperCase();return h("div",{onClick,style:{width:size,height:size,borderRadius:"50%",overflow:"hidden",background:perfil.foto?"transparent":perfil.cor||C.accent,display:"flex",alignItems:"center",justifyContent:"center",cursor:onClick?"pointer":"default",flexShrink:0,...style}},perfil.foto?h("img",{src:perfil.foto,style:{width:"100%",height:"100%",objectFit:"cover"}}):h("span",{style:{fontSize:size*0.38,fontWeight:800,color:"#0D0D0F"}},ini));}
-function Spinner(){
-  return h("div",{className:"loading-wrap"},
-    h("div",{className:"lc-logo-wrap"},
-      h("img",{
-        src:"/favicon-512x512.png",
-        alt:APP_NAME,
-        className:"lc-img",
-        style:{width:140,height:140,borderRadius:"50%",objectFit:"cover"}
-      }),
-      // Anel animado desenhado por cima da imagem
-      h("svg",{
-        className:"lc-ring",
-        width:164,height:164,viewBox:"0 0 164 164",
-        fill:"none",xmlns:"http://www.w3.org/2000/svg",
-        style:{position:"absolute",top:-12,left:-12}
-      },
-        h("defs",null,
-          h("filter",{id:"ring-glow",x:"-30%",y:"-30%",width:"160%",height:"160%"},
-            h("feGaussianBlur",{stdDeviation:"3",result:"blur"}),
-            h("feMerge",null,
-              h("feMergeNode",{in:"blur"}),
-              h("feMergeNode",{in:"SourceGraphic"})
-            )
-          )
-        ),
-        // Trilha do anel (fundo)
-        h("circle",{cx:82,cy:82,r:78,stroke:"#00E5A015",strokeWidth:3,fill:"none"}),
-        // Anel que se desenha
-        h("circle",{
-          className:"lc-circle",
-          cx:82,cy:82,r:78,
-          fill:"none",stroke:"#00E5A0",strokeWidth:3,
-          strokeLinecap:"round",
-          filter:"url(#ring-glow)",
-          style:{transformOrigin:"82px 82px",transform:"rotate(-90deg)"}
-        })
-      )
-    ),
-    h("div",{className:"loading-text"},APP_NAME.toUpperCase())
-  );
-}
 
-// ─── TELAS AUTH ────────────────────────────────────────────────────────────
-function TelaPerfis({perfis,onSelecionar,onCriar,onAdmin,onLoginCredenciais}){
-  const[usuario,setUsuario]=useState("");
-  const[senha,setSenha]=useState("");
-  const[lembrar,setLembrar]=useState(true);
-  const[erro,setErro]=useState("");
-  const[loading,setLoading]=useState(false);
-  const[mostrarPerfis,setMostrarPerfis]=useState(false);
-  const[bioDisp,setBioDisp]=useState(false);
-  const[bioLoading,setBioLoading]=useState(false);
-  const[mostrarBioFallback,setMostrarBioFallback]=useState(false);
-  const perfisComBio=perfis.filter(p=>temBiometrico(p.id));
-  useEffect(()=>{biometricDisponivel().then(ok=>setBioDisp(ok));},[]);
-  const tentarLogin=async()=>{
-    if(!usuario||!senha||loading)return;
-    setLoading(true);setErro("");
-    const res=await onLoginCredenciais(usuario,senha,lembrar);
-    if(!res?.ok)setErro(res?.motivo==="usuario"?"Usuário não encontrado.":"Senha incorreta.");
-    setLoading(false);
-  };
-  const tentarBioPerfil=async(p)=>{
-    if(!p||bioLoading)return false;
-    setBioLoading(true);setErro("");
-    const res=await onLoginCredenciais(normalizarUsuario(p.username),null,true,{biometric:true,perfilId:p.id});
-    if(!res?.ok)setErro("Não foi possível autenticar com Face ID.");
-    setBioLoading(false);
-    return!!res?.ok;
-  };
-  const tentarBioInicial=async()=>{
-    if(bioLoading||!perfisComBio.length)return;
-    const lastId=localStorage.getItem(LS_LAST_BIO_KEY);
-    const preferido=perfisComBio.find(p=>p.id===lastId)||perfisComBio[0];
-    const ok=await tentarBioPerfil(preferido);
-    if(!ok)setMostrarBioFallback(true);
-  };
-  return h("div",{style:{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 24px",position:"relative"}},
-    // Botão admin discreto no canto superior direito
-    h("button",{onClick:onAdmin,style:{position:"absolute",top:"env(safe-area-inset-top, 16px)",right:16,marginTop:16,background:"none",border:"none",cursor:"pointer",padding:8,opacity:0.3,transition:"opacity 0.2s"},
-      onMouseEnter:ev=>ev.currentTarget.style.opacity="1",
-      onMouseLeave:ev=>ev.currentTarget.style.opacity="0.3"},
-      h(Icon,{name:"target",size:18,color:C.muted})
-    ),
-    h("img",{
-      src:"/favicon-512x512.png",
-      alt:APP_NAME,
-      style:{width:80,height:80,borderRadius:"50%",objectFit:"cover",
-        filter:"drop-shadow(0 0 12px #00E5A0AA)",marginBottom:0}
-    }),
-    h("div",{style:{fontSize:22,fontWeight:800,color:C.text,marginBottom:4}},APP_NAME),
-    h("div",{style:{fontSize:14,color:C.muted,marginBottom:20}},"Entre com usuário e senha"),
-    h("div",{style:{width:"100%",maxWidth:340,marginBottom:24}},
-      h(Inp,{label:"Usuário",placeholder:"Seu nome de usuário",value:usuario,onChange:ev=>{setUsuario(ev.target.value);setErro("");}}),
-      h(Inp,{label:"Senha",type:"password",placeholder:"Sua senha",value:senha,onChange:ev=>{setSenha(ev.target.value);setErro("");},onKeyDown:ev=>ev.key==="Enter"&&tentarLogin()}),
-      h("label",{style:{display:"flex",alignItems:"center",gap:8,fontSize:13,color:C.muted,marginBottom:10,cursor:"pointer"}},
-        h("input",{type:"checkbox",checked:lembrar,onChange:ev=>setLembrar(ev.target.checked)}),
-        "Manter conectado neste aparelho"
-      ),
-      erro&&h("div",{style:{fontSize:13,color:C.warn,marginBottom:8,textAlign:"center"}},erro),
-      h(Btn,{onClick:tentarLogin,style:{marginTop:0}},loading?"Entrando...":"Entrar")
-    ),
-    bioDisp&&perfisComBio.length>0&&h("div",{style:{width:"100%",maxWidth:340,marginBottom:16}},
-      h(Btn,{onClick:tentarBioInicial,style:{marginTop:0,background:C.infoDim,color:C.info,border:`1px solid ${C.info}`}},
-        h(Icon,{name:"faceId",size:16,color:C.info}),
-        bioLoading?"Aguardando...":"Entrar com Face ID"
-      ),
-      h("button",{onClick:()=>setMostrarBioFallback(v=>!v),style:{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer",textDecoration:"underline",width:"100%",marginTop:6}},
-        mostrarBioFallback?"Ocultar escolha de perfil":"Usar outro perfil com Face ID"
-      ),
-      mostrarBioFallback&&h("div",{style:{display:"flex",flexWrap:"wrap",gap:12,justifyContent:"center",marginTop:10}},
-        ...perfisComBio.map(p=>h("button",{key:p.id,onClick:()=>tentarBioPerfil(p),style:{background:"transparent",border:`1px solid ${C.border}`,borderRadius:14,padding:"8px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",minWidth:84}},
-          h(Avatar,{perfil:p,size:44}),
-          h("span",{style:{fontSize:11,color:C.muted,marginTop:6,maxWidth:70,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},p.nome)
-        ))
-      )
-    ),
-    h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:10,marginBottom:18}},
-      h("button",{onClick:onCriar,style:{width:72,height:72,borderRadius:"50%",border:`2px dashed ${C.border}`,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}},
-        h("span",{style:{fontSize:28,color:C.muted}},"+")
-      ),
-      h("span",{style:{fontSize:13,color:C.muted}},"Novo perfil")
-    ),
-    h("button",{onClick:()=>setMostrarPerfis(v=>!v),style:{background:"none",border:"none",color:C.muted,fontSize:13,marginBottom:14,cursor:"pointer",textDecoration:"underline"}},
-      mostrarPerfis?"Ocultar perfis":"Ou escolha um perfil"
-    ),
-    mostrarPerfis&&h("div",{style:{display:"flex",flexWrap:"wrap",gap:24,justifyContent:"center",marginBottom:40,maxWidth:400}},
-      ...perfis.map(p=>h("div",{key:p.id,style:{display:"flex",flexDirection:"column",alignItems:"center",gap:10}},
-        h(Avatar,{perfil:p,size:80,onClick:()=>onSelecionar(p)}),
-        h("span",{style:{fontSize:13,fontWeight:600,color:C.text}},p.nome)
-      ))
-    )
-  );
-}
+const getHorariosDia = (dia) => dia===“Sex” ? HORARIOS_SEXTA : HORARIOS_SEMANA;
 
-function TelaDefinirUsuario({perfil,onSalvar,onSair}){
-  const[usuario,setUsuario]=useState("");
-  const[erro,setErro]=useState("");
-  const[loading,setLoading]=useState(false);
-  const salvar=async()=>{
-    if(loading)return;
-    setLoading(true);setErro("");
-    const res=await onSalvar(usuario);
-    if(!res?.ok){
-      const msg=res?.motivo==="duplicado"?"Esse nome de usuário já existe.":"Use 3 a 20 caracteres: letras minúsculas, números, ponto ou underline.";
-      setErro(msg);
-    }
-    setLoading(false);
-  };
-  return h("div",{style:{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 24px"}},
-    h(Avatar,{perfil,size:86,style:{marginBottom:16}}),
-    h("div",{style:{fontSize:20,fontWeight:800,color:C.text,marginBottom:8,textAlign:"center"}},"Crie seu nome de usuário"),
-    h("div",{style:{fontSize:13,color:C.muted,marginBottom:22,textAlign:"center",lineHeight:1.5}},"Olá, "+perfil.nome+". Defina um usuário único para seus próximos logins."),
-    h("div",{style:{width:"100%",maxWidth:340}},
-      h(Inp,{label:"Nome de usuário",placeholder:"ex: joao.silva",value:usuario,onChange:ev=>{setUsuario(ev.target.value);setErro("");}}),
-      h("div",{style:{fontSize:12,color:C.muted,marginBottom:12}},"Permitido: a-z, 0-9, ponto e underline."),
-      erro&&h("div",{style:{fontSize:13,color:C.warn,marginBottom:8,textAlign:"center"}},erro),
-      h(Btn,{onClick:salvar},loading?"Salvando...":"Salvar e entrar"),
-      h(Btn,{variant:"ghost",onClick:onSair,style:{marginTop:8}},"Sair")
-    )
-  );
-}
+/* ─── MOCK DATA ──────────────────────────────────────────────── */
+const ALUNO = {
+nome:“Lucas Mendes”, plano:“Mensal”, vencimento:“30/04/2025”,
+checkinsMes:12, meta:15, streak:5,
+isento:false,
+};
 
-function TelaSenha({perfil,onEntrar,onEntrarBiometrico,onVoltar}){
-  const[senha,setSenha]=useState("");const[erro,setErro]=useState(false);const[loading,setLoading]=useState(false);
-  const[recuperando,setRecuperando]=useState(false);const[codRec,setCodRec]=useState("");const[erroRec,setErroRec]=useState(false);
-  const[novaSenhaRec,setNovaSenhaRec]=useState("");const[codOk,setCodOk]=useState(false);
-  const[bioDisp,setBioDisp]=useState(false);const[bioLoading,setBioLoading]=useState(false);
-  const[mostraSenha,setMostraSenha]=useState(false);
-  const[lembrar,setLembrar]=useState(true);
-
-  useEffect(()=>{
-    biometricDisponivel().then(ok=>setBioDisp(ok&&temBiometrico(perfil.id)));
-  },[perfil.id]);
-
-  // Tenta biometria automaticamente se disponível
-  useEffect(()=>{
-    if(bioDisp){
-      setBioLoading(true);
-      autenticarBiometrico(perfil.id).then(ok=>{
-        setBioLoading(false);
-        if(ok)onEntrarBiometrico(perfil);
-      }).catch(()=>setBioLoading(false));
-    }
-  },[bioDisp]);
-
-  const tentar=async()=>{if(!senha||loading)return;setLoading(true);const ok=await onEntrar(perfil,senha,lembrar);if(!ok){setErro(true);setSenha("");}setLoading(false);};
-  const tentarBio=async()=>{setBioLoading(true);const ok=await onEntrarBiometrico(perfil);if(!ok)setBioLoading(false);};
-  const verificarCod=()=>{if(codRec===perfil.codigoRecuperacao){setCodOk(true);setErroRec(false);}else setErroRec(true);};
-  const redefinir=async()=>{
-    if(novaSenhaRec.length<4)return;
-    if(OFFLINE_MODE){
-      const perfis=await dbCarregarPerfis();
-      const i=perfis.findIndex(p=>p.id===perfil.id);
-      if(i>=0){
-        perfis[i]={...perfis[i],senhaHash:hashSenha(novaSenhaRec)};
-        localStorage.setItem(LS_PERFIS_KEY,JSON.stringify(perfis));
-      }
-    }else{
-      await sb.from("perfis").update({senha_hash:hashSenha(novaSenhaRec)}).eq("id",perfil.id);
-    }
-    alert("Senha redefinida!");
-    setRecuperando(false);setCodRec("");setCodOk(false);
-  };
-
-  return h("div",{style:{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 24px"}},
-    h(Avatar,{perfil,size:90,style:{marginBottom:16}}),
-    h("div",{style:{fontSize:20,fontWeight:700,color:C.text,marginBottom:bioLoading?16:32}},perfil.nome),
-    bioLoading&&h("div",{style:{fontSize:13,color:C.muted,marginBottom:24,display:"flex",alignItems:"center",gap:8}},h(Icon,{name:"faceId",size:20,color:C.accent}),"Aguardando Face ID..."),
-    h("div",{style:{width:"100%",maxWidth:320}},
-      !recuperando&&h(Fragment,null,
-        h("div",{style:{position:"relative",marginBottom:8}},
-          h("input",{type:mostraSenha?"text":"password",placeholder:"Senha",value:senha,onChange:ev=>{setSenha(ev.target.value);setErro(false);},onKeyDown:ev=>ev.key==="Enter"&&tentar(),style:{width:"100%",background:C.card,border:`2px solid ${erro?C.warn:senha?C.accent:C.border}`,borderRadius:12,padding:"14px 16px",color:C.text,fontSize:16,outline:"none",boxSizing:"border-box",textAlign:"center",letterSpacing:mostraSenha?0:4}}),
-          h("button",{onClick:()=>setMostraSenha(v=>!v),style:{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",padding:4}},h(Icon,{name:mostraSenha?"eyeOff":"eye",size:18,color:C.muted}))
-        ),
-        erro&&h("div",{style:{textAlign:"center",color:C.warn,fontSize:13,marginBottom:8}},"Senha incorreta."),
-        h("label",{style:{display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:13,color:C.muted,marginBottom:10,cursor:"pointer"}},
-          h("input",{type:"checkbox",checked:lembrar,onChange:ev=>setLembrar(ev.target.checked)}),
-          "Manter conectado neste aparelho"
-        ),
-        h("button",{onClick:tentar,disabled:!senha||loading,style:{width:"100%",background:senha&&!loading?C.accent:C.subtle,color:senha&&!loading?C.bg:C.muted,border:"none",borderRadius:12,padding:"14px",fontSize:16,fontWeight:700,cursor:senha?"pointer":"default",marginBottom:12}},loading?"Entrando...":"Entrar"),
-        bioDisp&&h("button",{onClick:tentarBio,disabled:bioLoading,style:{width:"100%",background:C.infoDim,border:`1px solid ${C.info}`,borderRadius:12,padding:"12px",fontSize:14,fontWeight:600,cursor:"pointer",color:C.info,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:8}},h(Icon,{name:"faceId",size:18,color:C.info}),bioLoading?"Aguardando...":"Entrar com Face ID"),
-        h("button",{onClick:onVoltar,style:{width:"100%",background:"none",border:`1px solid ${C.border}`,borderRadius:12,padding:"12px",fontSize:14,color:C.muted,cursor:"pointer",fontWeight:600}},"← Voltar"),
-        h("button",{onClick:()=>setRecuperando(true),style:{background:"none",border:"none",color:C.muted,fontSize:13,cursor:"pointer",marginTop:16,textDecoration:"underline",width:"100%"}},"Esqueci minha senha")
-      ),
-      recuperando&&h("div",null,
-        h("div",{style:{fontSize:14,color:C.muted,marginBottom:16,textAlign:"center"}},"Código de recuperação"),
-        !codOk&&h(Fragment,null,h("input",{inputMode:"numeric",placeholder:"00000000",value:codRec,onChange:ev=>setCodRec(ev.target.value),style:{width:"100%",background:C.card,border:`2px solid ${erroRec?C.warn:C.border}`,borderRadius:12,padding:"14px",color:C.text,fontSize:20,outline:"none",boxSizing:"border-box",marginBottom:8,textAlign:"center",letterSpacing:6}}),erroRec&&h("div",{style:{color:C.warn,fontSize:13,marginBottom:8,textAlign:"center"}},"Código incorreto."),h(Btn,{onClick:verificarCod},"Verificar")),
-        codOk&&h(Fragment,null,h("div",{style:{color:C.accent,fontSize:13,marginBottom:12,textAlign:"center"}},"✓ Código correto!"),h("input",{type:"password",placeholder:"Nova senha",value:novaSenhaRec,onChange:ev=>setNovaSenhaRec(ev.target.value),style:{width:"100%",background:C.card,border:`2px solid ${C.accent}`,borderRadius:12,padding:"14px",color:C.text,fontSize:16,outline:"none",boxSizing:"border-box",marginBottom:8}}),h(Btn,{onClick:redefinir},"Redefinir senha")),
-        h(Btn,{variant:"ghost",onClick:()=>{setRecuperando(false);setCodRec("");setCodOk(false);},style:{marginTop:8}},"Cancelar")
-      )
-    )
-  );
-}
-
-function FormCriarPerfil({onSalvar,onCancelar}){
-  const[nome,setNome]=useState("");const[username,setUsername]=useState("");const[senha,setSenha]=useState("");const[cor,setCor]=useState(AVATAR_CORES[0]);
-  const[foto,setFoto]=useState(null);const[erro,setErro]=useState("");const[codigo,setCodigo]=useState(null);const[loading,setLoading]=useState(false);
-  const escolherFoto=ev=>{const f=ev.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=e=>setFoto(e.target.result);r.readAsDataURL(f);};
-  const salvar=async()=>{
-    if(nome.trim().length<2){setErro("Nome precisa ter ao menos 2 letras.");return;}
-    if(!usuarioValido(username)){setErro("Usuário inválido. Use 3-20 caracteres: a-z, 0-9, . ou _.");return;}
-    if(senha.length<4){setErro("Senha precisa ter ao menos 4 caracteres.");return;}
-    setLoading(true);
-    const cod=await onSalvar(nome.trim(),normalizarUsuario(username),senha,cor,foto);
-    if(cod)setCodigo(cod);else setErro("Nome de usuário já existe.");
-    setLoading(false);
-  };
-  const preview={nome,cor,foto};
-  if(codigo)return h("div",{style:{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 24px"}},
-    h("div",{style:{fontSize:40,marginBottom:12}},"🔑"),
-    h("div",{style:{fontSize:20,fontWeight:800,color:C.text,marginBottom:8,textAlign:"center"}},"Anote seu código de recuperação"),
-    h("div",{style:{fontSize:14,color:C.muted,marginBottom:24,textAlign:"center",lineHeight:1.6}},"Se esquecer a senha, use este código para recuperar o acesso."),
-    h("div",{style:{background:C.subtle,border:`2px solid ${C.accent}`,borderRadius:16,padding:"20px 32px",marginBottom:24}},h("div",{style:{fontSize:32,fontWeight:800,color:C.accent,letterSpacing:6,textAlign:"center"}},codigo)),
-    h("div",{style:{fontSize:13,color:C.warn,marginBottom:28,textAlign:"center"}},"⚠️ Não pode ser recuperado depois."),
-    h(Btn,{onClick:onCancelar},"Entendi, já anotei!")
-  );
-  return h("div",{style:{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 24px"}},
-    h("div",{style:{fontSize:20,fontWeight:800,color:C.text,marginBottom:32}},"Criar perfil"),
-    h("div",{style:{position:"relative",marginBottom:32}},h(Avatar,{perfil:preview,size:100}),h("label",{style:{position:"absolute",bottom:0,right:0,width:32,height:32,borderRadius:"50%",background:C.card,border:`2px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16}},"📷",h("input",{type:"file",accept:"image/*",onChange:escolherFoto,style:{display:"none"}}))),
-    h("div",{style:{width:"100%",maxWidth:340}},
-      h(Inp,{label:"Nome",placeholder:"Ex: João",value:nome,onChange:ev=>setNome(ev.target.value)}),
-      h(Inp,{label:"Nome de usuário",placeholder:"ex: joao.silva",value:username,onChange:ev=>setUsername(ev.target.value)}),
-      h("div",{style:{marginBottom:14}},h("div",{style:{fontSize:12,color:C.muted,marginBottom:6,fontWeight:600}},"SENHA"),h("input",{type:"password",placeholder:"Mínimo 4 caracteres",value:senha,onChange:ev=>setSenha(ev.target.value),style:{width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:15,outline:"none",boxSizing:"border-box"}})),
-      h("div",{style:{marginBottom:20}},h("div",{style:{fontSize:12,color:C.muted,marginBottom:10,fontWeight:600}},"COR DO AVATAR"),h("div",{style:{display:"flex",gap:10,flexWrap:"wrap"}},...AVATAR_CORES.map(cl=>h("button",{key:cl,onClick:()=>setCor(cl),style:{width:36,height:36,borderRadius:"50%",background:cl,border:`3px solid ${cor===cl?C.text:"transparent"}`,cursor:"pointer"}})))),
-      erro&&h("div",{style:{color:C.warn,fontSize:13,marginBottom:12,textAlign:"center"}},erro),
-      h(Btn,{onClick:salvar},loading?"Criando...":"Criar perfil"),
-      h(Btn,{variant:"ghost",onClick:onCancelar,style:{marginTop:8}},"Cancelar")
-    )
-  );
-}
-
-// ─── SELETOR DE MÊS ───────────────────────────────────────────────────────
-function MesSeletor({mes,setMes,db,setDb}){
-  const nav=delta=>{const nm=ymAdd(mes,delta);setDb(prev=>garantirMes(prev,nm));setMes(nm);};
-  return h("div",{style:{display:"flex",alignItems:"center",gap:4}},
-    h("button",{onClick:()=>nav(-1),style:{background:C.subtle,border:"none",borderRadius:8,padding:"6px 8px",cursor:"pointer"}},h(Icon,{name:"chevL",size:14,color:C.muted})),
-    h("span",{style:{fontSize:12,color:C.text,fontWeight:600,minWidth:88,textAlign:"center",textTransform:"capitalize"}},ymLabel(mes).split(" de ").join(" ")),
-    h("button",{onClick:()=>nav(1),style:{background:C.subtle,border:"none",borderRadius:8,padding:"6px 8px",cursor:"pointer"}},h(Icon,{name:"chevR",size:14,color:C.muted}))
-  );
-}
-
-// ─── DASHBOARD ────────────────────────────────────────────────────────────
-function Dashboard({db,setDb,mes}){
-  const[modal,setModal]=useState(null);
-  const[saldoInput,setSaldoInput]=useState("");
-  const m=db.meses[mes]||mesVazio(mes);
-  const fg=(db.contasFixasGlobais||[]).filter(f=>f.ativa!==false);
-  const pagas=m.fixasGlobaisPagas||[];const vm=m.fixasGlobaisValores||{};
-  const parcelasMes=(m.parcelasPagas||[]).reduce((s,p)=>s+toN(p.valor),0);
-  const fixasPagas=m.fixas.filter(f=>f.pago).reduce((s,f)=>s+toN(f.valor),0)+fg.filter(f=>pagas.includes(f.id)).reduce((s,f)=>s+toN(vm[f.id]??f.valor),0);
-  // Gastos: só conta os pagamentos À VISTA no saldo
-  const gastosAvista=m.gastos.filter(g=>g.pagamento!=="cartao").reduce((s,g)=>s+toN(g.valor),0);
-  const gastosCartao=m.gastos.filter(g=>g.pagamento==="cartao").reduce((s,g)=>s+toN(g.valor),0);
-  const totalEntradas=(m.entradas||[]).reduce((s,e)=>s+toN(e.valor),0);
-  const saldoReal=toN(m.saldoBase)+totalEntradas-fixasPagas-gastosAvista-parcelasMes;
-  const divAtivas=(db.dividas||[]).filter(d=>d.parcelas>0);
-  const totalDiv=divAtivas.reduce((s,d)=>s+toN(d.parcela)*d.parcelas,0);
-  const parcMes=divAtivas.reduce((s,d)=>s+toN(d.parcela),0);
-  const totalInv=(db.investimentos||[]).reduce((s,i)=>s+toN(i.cotas)*toN(i.precoMedio),0);
-  const totalReserva=(db.reservas||[]).reduce((s,r)=>s+toN(r.valor),0);
-  const rendaMensal=(db.investimentos||[]).reduce((s,i)=>s+toN(i.rendaMensal),0);
-  const fixasPend=m.fixas.filter(f=>!f.pago).reduce((s,f)=>s+toN(f.valor),0)+fg.filter(f=>!pagas.includes(f.id)).reduce((s,f)=>s+toN(vm[f.id]??f.valor),0);
-  const saldoAoQuitar=saldoReal-fixasPend;
-  // Saldo estimado ao final do mês: inclui cartão de crédito e parcelas pendentes
-  const parcelamentosMes=(db.parcelamentos||[]).filter(p=>p.parcelaAtual<=p.totalParcelas).reduce((s,p)=>s+p.valorParcela,0);
-  const saldoFinalEstimado=saldoReal-fixasPend-gastosCartao-parcelamentosMes;
-  const alertas=[];
-  divAtivas.forEach(d=>{if(!d.vencimento)return;const diff=(new Date(d.vencimento)-new Date())/86400000;if(diff<=5&&diff>=0)alertas.push(`${d.nome}: vence em ${Math.ceil(diff)} dia(s)`);});
-  m.fixas.filter(f=>!f.pago&&f.vencimento).forEach(f=>{const diff=(new Date(f.vencimento)-new Date())/86400000;if(diff<=3&&diff>=0)alertas.push(`${f.nome}: vence em ${Math.ceil(diff)} dia(s)`);});
-  const salvarSaldo=()=>{setDb(prev=>{const p=garantirMes(prev,mes);return{...p,meses:{...p.meses,[mes]:{...p.meses[mes],saldoBase:toN(saldoInput)}}};});setModal(null);};
-  return h("div",null,
-    h(Card,{onClick:()=>{setSaldoInput(m.saldoBase);setModal("saldo");},style:{background:"linear-gradient(135deg,#00E5A011,#161618)",borderColor:C.accent+"44"}},
-      h("div",{style:{fontSize:12,color:C.muted,fontWeight:600,letterSpacing:1,marginBottom:4}},"SALDO DISPONÍVEL"),
-      h("div",{style:{fontSize:34,fontWeight:800,color:saldoReal<0?C.warn:C.accent,letterSpacing:-1}},h(Val,null,fmt(saldoReal))),
-      h("div",{style:{display:"flex",gap:12,marginTop:8,flexWrap:"wrap"}},
-        h("span",{style:{fontSize:11,color:C.muted}},"Base: ",h(Val,null,fmt(m.saldoBase))),
-        totalEntradas>0&&h("span",{style:{fontSize:11,color:C.muted}},"Entradas: ",h(Val,{style:{color:C.green}},`+${fmt(totalEntradas)}`)),
-        h("span",{style:{fontSize:11,color:C.muted}},"Gastos: ",h(Val,{style:{color:C.warn}},`−${fmt(gastosAvista)}`)),
-        fixasPagas>0&&h("span",{style:{fontSize:11,color:C.muted}},"Contas: ",h(Val,{style:{color:C.warn}},`−${fmt(fixasPagas)}`)),
-        parcelasMes>0&&h("span",{style:{fontSize:11,color:C.muted}},"Dívidas: ",h(Val,{style:{color:C.warn}},`−${fmt(parcelasMes)}`))
-      ),
-      h("div",{style:{fontSize:11,color:C.muted,marginTop:6}},"Toque para definir saldo base")
-    ),
-    // Card cartão de crédito
-    gastosCartao>0&&h(Card,{style:{borderColor:C.purple+"44",background:C.purpleDim,marginBottom:12}},
-      h("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:4}},h(Icon,{name:"card",size:16,color:C.purple}),h("div",{style:{fontSize:12,color:C.purple,fontWeight:700,letterSpacing:0.5}},"GASTOS NO CARTÃO (este mês)")),
-      h("div",{style:{fontSize:22,fontWeight:800,color:C.purple}},h(Val,null,fmt(gastosCartao))),
-      h("div",{style:{fontSize:12,color:C.muted,marginTop:2}},"Não abatido do saldo — será cobrado na fatura")
-    ),
-    alertas.length>0&&h(Card,{style:{borderColor:C.warn+"55",background:C.warnDim}},
-      h("div",{style:{display:"flex",gap:8,alignItems:"center",marginBottom:8}},h(Icon,{name:"alert",size:15,color:C.warn}),h("span",{style:{fontSize:13,fontWeight:700,color:C.warn}},"ALERTAS")),
-      alertas.map((a,i)=>h("div",{key:i,style:{fontSize:13,color:C.text,marginBottom:4,paddingLeft:22}},`• ${a}`))
-    ),
-    h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}},
-      h(Card,{style:{marginBottom:0,borderColor:C.warn+"44"}},h("div",{style:{fontSize:10,color:C.muted,fontWeight:600,marginBottom:4}},"DÍVIDAS RESTANTES"),h("div",{style:{fontSize:18,fontWeight:800,color:C.warn}},h(Val,null,fmt(totalDiv))),h("div",{style:{fontSize:11,color:C.muted,marginTop:2}},`parcela: `,h(Val,null,fmt(parcMes)),`/mês`)),
-      h(Card,{style:{marginBottom:0,borderColor:C.gold+"44"}},h("div",{style:{fontSize:10,color:C.muted,fontWeight:600,marginBottom:4}},"CONTAS PENDENTES"),h("div",{style:{fontSize:18,fontWeight:800,color:C.gold}},h(Val,null,fmt(fixasPend))),h("div",{style:{fontSize:11,color:saldoAoQuitar<0?C.warn:C.accent,marginTop:4,fontWeight:600}},"ao quitar: ",h(Val,null,fmt(saldoAoQuitar)))),
-      h(Card,{style:{marginBottom:0,borderColor:C.info+"44"}},h("div",{style:{fontSize:10,color:C.muted,fontWeight:600,marginBottom:4}},"INVESTIMENTOS"),h("div",{style:{fontSize:18,fontWeight:800,color:C.info}},h(Val,null,fmt(totalInv))),h("div",{style:{fontSize:11,color:C.muted,marginTop:2}},`renda: `,h(Val,null,fmt(rendaMensal)),`/mês`)),
-      h(Card,{style:{marginBottom:0,borderColor:C.green+"44"}},h("div",{style:{fontSize:10,color:C.muted,fontWeight:600,marginBottom:4}},"RESERVA / POUPANÇA"),h("div",{style:{fontSize:18,fontWeight:800,color:C.green}},h(Val,null,fmt(totalReserva))),h("div",{style:{fontSize:11,color:C.muted,marginTop:2}},"emergência e poupança"))
-    ),
-    // Card saldo estimado fim do mês
-    h(Card,{style:{borderColor:saldoFinalEstimado<0?C.warn+"66":C.accent+"44",background:saldoFinalEstimado<0?C.warnDim:C.accentDim,marginBottom:12}},
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
-        h("div",null,
-          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,letterSpacing:0.5,marginBottom:4}},"SALDO ESTIMADO FIM DO MÊS"),
-          h("div",{style:{fontSize:26,fontWeight:800,color:saldoFinalEstimado<0?C.warn:C.accent}},h(Val,null,fmt(saldoFinalEstimado))),
-          h("div",{style:{fontSize:11,color:C.muted,marginTop:4}},"após contas + gastos à vista + cartão + parcelamentos")
-        ),
-        h("div",{style:{fontSize:30}},saldoFinalEstimado<0?"😳":"🥳")
-      ),
-      (gastosCartao>0||parcelamentosMes>0)&&h("div",{style:{borderTop:`1px solid ${C.border}`,marginTop:10,paddingTop:10,display:"flex",gap:12,flexWrap:"wrap"}},
-        gastosCartao>0&&h("span",{style:{fontSize:11,color:C.muted}},"Cartão: ",h(Val,{style:{color:C.purple,fontWeight:700}},fmt(gastosCartao))),
-        parcelamentosMes>0&&h("span",{style:{fontSize:11,color:C.muted}},"Parcelamentos: ",h(Val,{style:{color:C.purple,fontWeight:700}},fmt(parcelamentosMes)))
-      )
-    ),
-    totalDiv>0&&totalInv>0&&h(Card,{style:{borderColor:C.info+"44",background:C.infoDim}},h("div",{style:{display:"flex",gap:8}},h(Icon,{name:"info",size:15,color:C.info}),h("div",{style:{fontSize:13,color:C.text,lineHeight:1.5}},h("b",{style:{color:C.info}},"💡 Sugestão — "),`Você tem `,h(Val,null,fmt(totalDiv)),` em dívidas. Considere quitar antes de investir mais.`))),
-    modal==="saldo"&&h(Modal,{title:"Definir Saldo Base",onClose:()=>setModal(null)},
-      h("div",{style:{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.6}},"Informe o saldo disponível. Somente gastos à vista e contas pagas são descontados."),
-      h(NInp,{label:"Saldo base (R$)",placeholder:"Ex: 3500",value:saldoInput,onChange:ev=>setSaldoInput(ev.target.value)}),
-      h(Btn,{onClick:salvarSaldo},"Salvar")
-    )
-  );
-}
-
-// ─── ABA GASTOS + CONTAS + ENTRADAS ───────────────────────────────────────
-function GastosContas({db,setDb,mes}){
-  const[subAba,setSubAba]=useState("gastos");
-  const m=db.meses[mes]||mesVazio(mes);
-
-  function SubGastos(){
-    const[modal,setModal]=useState(false);
-    const[editModal,setEditModal]=useState(null);
-    const[rachaModal,setRachaModal]=useState(null);
-    const[gastoOpcoes,setGastoOpcoes]=useState(null);
-    const[filter,setFilter]=useState("todos");
-    const[form,setForm]=useState({valor:"",categoria:"Alimentação",descricao:"",data:todayStr(),pagamento:"avista"});
-    const[novaCategoria,setNovaCategoria]=useState("");
-    const catsCustom=db.catsCustom||[];
-    const todasCats=[...CATS,...catsCustom];
-    const adicionarCat=()=>{const n=novaCategoria.trim();if(!n||todasCats.includes(n))return;setDb(prev=>({...prev,catsCustom:[...catsCustom,n]}));setForm(f=>({...f,categoria:n}));setNovaCategoria("");};
-    const totalAvista=m.gastos.filter(g=>g.pagamento!=="cartao").reduce((s,g)=>s+toN(g.valor),0);
-    const totalCartao=m.gastos.filter(g=>g.pagamento==="cartao").reduce((s,g)=>s+toN(g.valor),0);
-    const filtrados=filter==="todos"?m.gastos:m.gastos.filter(g=>g.categoria===filter);
-    // Somatório por categoria
-    const totalFiltrado=filtrados.reduce((s,g)=>s+toN(g.valor),0);
-    const totalFiltradoAvista=filtrados.filter(g=>g.pagamento!=="cartao").reduce((s,g)=>s+toN(g.valor),0);
-    const totalFiltradoCartao=filtrados.filter(g=>g.pagamento==="cartao").reduce((s,g)=>s+toN(g.valor),0);
-    const totalPorCat=cat=>m.gastos.filter(g=>g.categoria===cat).reduce((s,g)=>s+toN(g.valor),0);
-    const add=()=>{if(!form.valor)return;const g={...form,id:Date.now(),valor:toN(form.valor)};setDb(prev=>{const p=garantirMes(prev,mes);return{...p,meses:{...p.meses,[mes]:{...p.meses[mes],gastos:[g,...p.meses[mes].gastos]}}};});setForm({valor:"",categoria:"Alimentação",descricao:"",data:todayStr(),pagamento:"avista"});setModal(false);};
-    const del=id=>{setDb(prev=>{const p=garantirMes(prev,mes);return{...p,meses:{...p.meses,[mes]:{...p.meses[mes],gastos:p.meses[mes].gastos.filter(g=>g.id!==id)}}};});setGastoOpcoes(null);};
-    const salvarEdicao=gastoEditado=>{setDb(prev=>{const p=garantirMes(prev,mes);return{...p,meses:{...p.meses,[mes]:{...p.meses[mes],gastos:p.meses[mes].gastos.map(g=>g.id===gastoEditado.id?gastoEditado:g)}}};});setEditModal(null);};
-    const salvarRacha=ga=>{setDb(prev=>{const p=garantirMes(prev,mes);return{...p,meses:{...p.meses,[mes]:{...p.meses[mes],gastos:p.meses[mes].gastos.map(g=>g.id===ga.id?ga:g)}}};});};
-    return h(Fragment,null,
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}},
-        h("div",{style:{display:"flex",gap:16}},
-          h("div",null,
-            h("div",{style:{fontSize:11,color:C.muted,fontWeight:600}},"À VISTA"),
-            h("div",{style:{fontSize:22,fontWeight:800,color:C.warn}},h(Val,null,fmt(totalAvista)))
-          ),
-          h("div",null,
-            h("div",{style:{fontSize:11,color:C.muted,fontWeight:600}},"CARTÃO"),
-            h("div",{style:{fontSize:22,fontWeight:800,color:C.purple}},h(Val,null,fmt(totalCartao)))
-          )
-        ),
-        h(Btn,{small:true,onClick:()=>setModal(true)},h(Icon,{name:"plus",size:14,color:C.bg}),"Registrar")
-      ),
-      // Tags de categoria com somatório
-      h("div",{style:{display:"flex",gap:8,overflowX:"auto",marginBottom:4,paddingBottom:4}},
-        ["todos",...todasCats].map(cat=>{
-          const total=cat==="todos"?totalFiltrado:totalPorCat(cat);
-          const ativo=filter===cat;
-          return h("button",{key:cat,onClick:()=>setFilter(cat),style:{whiteSpace:"nowrap",padding:"6px 14px",borderRadius:99,fontSize:12,fontWeight:600,background:ativo?C.accent:C.subtle,color:ativo?C.bg:C.muted,border:"none",cursor:"pointer"}},cat,total>0&&` · ${fmt(total)}`);
-        })
-      ),
-      // Somatório da categoria selecionada
-      filter!=="todos"&&h("div",{style:{padding:"6px 2px 12px",display:"flex",gap:12}},
-        totalFiltradoAvista>0&&h("span",{style:{fontSize:12,color:C.warn,fontWeight:600}},"À vista: ",h(Val,null,fmt(totalFiltradoAvista))),
-        totalFiltradoCartao>0&&h("span",{style:{fontSize:12,color:C.purple,fontWeight:600}},"Cartão: ",h(Val,null,fmt(totalFiltradoCartao)))
-      ),
-      // Cards de gasto clicáveis (sem ícones visíveis)
-      filtrados.map(g=>{
-        const racha=g.racha;const pendentes=racha?racha.pessoas.filter(p=>!p.pago&&p.nome.trim()):[];
-        const isCartao=g.pagamento==="cartao";
-        return h("div",{key:g.id},
-          h("div",{onClick:()=>setGastoOpcoes(g),style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"12px 0",borderBottom:racha?"none":`1px solid ${C.border}`,cursor:"pointer"}},
-            h("div",{style:{flex:1}},
-              h("div",{style:{display:"flex",alignItems:"center",gap:6}},
-                h("div",{style:{fontSize:14,fontWeight:600}},g.descricao||g.categoria),
-                isCartao&&h(Icon,{name:"card",size:13,color:C.purple})
-              ),
-              h("div",{style:{display:"flex",gap:6,alignItems:"center",marginTop:2,flexWrap:"wrap"}},
-                h("span",{style:{fontSize:12,color:C.muted}},`${g.categoria} · ${g.data}`),
-                isCartao&&h(Badge,{label:"cartão",color:C.purple}),
-                racha&&h(Badge,{label:pendentes.length>0?`⏳ ${pendentes.length} devendo`:"✓ quitado",color:pendentes.length>0?C.gold:C.accent}),
-                racha&&racha.quemPagou&&h("span",{style:{fontSize:11,color:C.muted}},`pagou: ${racha.quemPagou}`)
-              )
-            ),
-            h("span",{style:{fontSize:15,fontWeight:700,color:isCartao?C.purple:C.warn,flexShrink:0}},h(Val,null,`−${fmt(g.valor)}`))
-          ),
-          racha&&pendentes.length>0&&h("div",{style:{background:C.goldDim,borderRadius:"0 0 10px 10px",padding:"8px 12px",marginBottom:8}},
-            pendentes.map((p,i)=>h("div",{key:i,style:{display:"flex",justifyContent:"space-between",fontSize:12,color:C.gold}},h("span",null,`⏳ ${p.nome}`),h("span",{style:{fontWeight:700}},fmt(p.valor))))
-          )
-        );
-      }),
-      filtrados.length===0&&h("div",{style:{textAlign:"center",padding:"32px 0",color:C.muted}},"Nenhum gasto registrado"),
-
-      // Modal opções do gasto (ao clicar no card)
-      gastoOpcoes&&h(Modal,{title:gastoOpcoes.descricao||gastoOpcoes.categoria,onClose:()=>setGastoOpcoes(null)},
-        h("div",{style:{background:C.subtle,borderRadius:12,padding:"12px 14px",marginBottom:16}},
-          h("div",{style:{fontSize:24,fontWeight:800,color:gastoOpcoes.pagamento==="cartao"?C.purple:C.warn}},h(Val,null,`−${fmt(gastoOpcoes.valor)}`)),
-          h("div",{style:{fontSize:13,color:C.muted}},`${gastoOpcoes.categoria} · ${gastoOpcoes.data} · ${gastoOpcoes.pagamento==="cartao"?"cartão":"à vista"}`)
-        ),
-        h(Btn,{onClick:()=>{setEditModal(gastoOpcoes);setGastoOpcoes(null);}},h(Icon,{name:"edit",size:15,color:C.bg}),"Editar gasto"),
-        h(Btn,{onClick:()=>{setRachaModal(gastoOpcoes);setGastoOpcoes(null);},variant:"ghost",style:{color:C.gold,marginTop:8}},h(Icon,{name:"split",size:15,color:C.gold}),"Rachar conta"),
-        h(Btn,{onClick:()=>del(gastoOpcoes.id),variant:"danger",style:{marginTop:8}},h(Icon,{name:"trash",size:15,color:C.bg}),"Excluir gasto")
-      ),
-      // Modal editar gasto
-      editModal&&h(Modal,{title:"Editar Gasto",onClose:()=>setEditModal(null)},
-        h(NInp,{label:"Valor (R$)",value:String(editModal.valor),onChange:ev=>setEditModal({...editModal,valor:ev.target.value})}),
-        h(Sel,{label:"Categoria",value:editModal.categoria,onChange:ev=>setEditModal({...editModal,categoria:ev.target.value})},todasCats.map(cat=>h("option",{key:cat},cat))),
-        h(Inp,{label:"Descrição",value:editModal.descricao||"",onChange:ev=>setEditModal({...editModal,descricao:ev.target.value})}),
-        h(Inp,{label:"Data",type:"date",value:editModal.data,max:todayStr(),onChange:ev=>setEditModal({...editModal,data:ev.target.value})}),
-        h("div",{style:{marginBottom:14}},
-          h("div",{style:{fontSize:12,color:C.muted,marginBottom:8,fontWeight:600}},"FORMA DE PAGAMENTO"),
-          h("div",{style:{display:"flex",gap:8}},
-            h("button",{onClick:()=>setEditModal({...editModal,pagamento:"avista"}),style:{flex:1,padding:"10px",borderRadius:10,border:`2px solid ${editModal.pagamento!=="cartao"?C.accent:C.border}`,background:editModal.pagamento!=="cartao"?C.accentDim:C.subtle,color:editModal.pagamento!=="cartao"?C.accent:C.muted,cursor:"pointer",fontSize:13,fontWeight:600}},"💵 À Vista"),
-            h("button",{onClick:()=>setEditModal({...editModal,pagamento:"cartao"}),style:{flex:1,padding:"10px",borderRadius:10,border:`2px solid ${editModal.pagamento==="cartao"?C.purple:C.border}`,background:editModal.pagamento==="cartao"?C.purpleDim:C.subtle,color:editModal.pagamento==="cartao"?C.purple:C.muted,cursor:"pointer",fontSize:13,fontWeight:600}},"💳 Cartão")
-          )
-        ),
-        h(Btn,{onClick:()=>salvarEdicao({...editModal,valor:toN(editModal.valor)})},"Salvar alterações")
-      ),
-      modal&&h(Modal,{title:"Registrar Gasto",onClose:()=>setModal(false)},
-        h(NInp,{label:"Valor (R$)",placeholder:"0,00",value:form.valor,onChange:ev=>setForm({...form,valor:ev.target.value})}),
-        h(Sel,{label:"Categoria",value:form.categoria,onChange:ev=>setForm({...form,categoria:ev.target.value})},
-          todasCats.map(cat=>h("option",{key:cat},cat)),
-          h("option",{value:"__nova__"},"+ Nova categoria...")
-        ),
-        form.categoria==="__nova__"&&h("div",{style:{display:"flex",gap:8,marginBottom:14}},
-          h("input",{placeholder:"Nome da categoria",value:novaCategoria,onChange:ev=>setNovaCategoria(ev.target.value),
-            onKeyDown:ev=>ev.key==="Enter"&&adicionarCat(),
-            style:{flex:1,background:C.subtle,border:`1px solid ${C.accent}`,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:15,outline:"none"}}),
-          h("button",{onClick:adicionarCat,style:{background:C.accent,color:C.bg,border:"none",borderRadius:10,padding:"12px 16px",fontSize:14,fontWeight:700,cursor:"pointer"}},"Criar")
-        ),
-        h(Inp,{label:"Descrição (opcional)",placeholder:"Ex: Jantar com amigos",value:form.descricao,onChange:ev=>setForm({...form,descricao:ev.target.value})}),
-        h(Inp,{label:"Data",type:"date",value:form.data,max:todayStr(),onChange:ev=>setForm({...form,data:ev.target.value})}),
-        // Toggle pagamento
-        h("div",{style:{marginBottom:14}},
-          h("div",{style:{fontSize:12,color:C.muted,marginBottom:8,fontWeight:600}},"FORMA DE PAGAMENTO"),
-          h("div",{style:{display:"flex",gap:8}},
-            h("button",{onClick:()=>setForm({...form,pagamento:"avista"}),style:{flex:1,padding:"10px",borderRadius:10,border:`2px solid ${form.pagamento==="avista"?C.accent:C.border}`,background:form.pagamento==="avista"?C.accentDim:C.subtle,color:form.pagamento==="avista"?C.accent:C.muted,cursor:"pointer",fontSize:13,fontWeight:600}},"💵 À Vista"),
-            h("button",{onClick:()=>setForm({...form,pagamento:"cartao"}),style:{flex:1,padding:"10px",borderRadius:10,border:`2px solid ${form.pagamento==="cartao"?C.purple:C.border}`,background:form.pagamento==="cartao"?C.purpleDim:C.subtle,color:form.pagamento==="cartao"?C.purple:C.muted,cursor:"pointer",fontSize:13,fontWeight:600}},h(Icon,{name:"card",size:13,color:form.pagamento==="cartao"?C.purple:C.muted})," Cartão")
-          ),
-          form.pagamento==="cartao"&&h("div",{style:{fontSize:12,color:C.purple,marginTop:6,padding:"6px 10px",background:C.purpleDim,borderRadius:8}},"Não será abatido do saldo disponível")
-        ),
-        h(Btn,{onClick:add},"Adicionar Gasto")
-      ),
-      rachaModal&&h(Modal,{title:"Rachar conta 🍻",onClose:()=>setRachaModal(null)},h(RachaContaModal,{gasto:rachaModal,onSalvar:salvarRacha,onClose:()=>setRachaModal(null)}))
-    );
-  }
-
-  function SubContas(){
-    const[modal,setModal]=useState(false);const[editGlobal,setEditGlobal]=useState(null);const[editValor,setEditValor]=useState("");
-    const[form,setForm]=useState({nome:"",valor:"",vencimento:"",categoria:"Outros",fixa:false});
-    const fg=(db.contasFixasGlobais||[]).filter(f=>f.ativa!==false);
-    const pagas=m.fixasGlobaisPagas||[];const vm=m.fixasGlobaisValores||{};
-    const salvarMes=fixas=>{setDb(prev=>{const p=garantirMes(prev,mes);return{...p,meses:{...p.meses,[mes]:{...p.meses[mes],fixas}}};});};
-    const toggleMes=id=>salvarMes(m.fixas.map(f=>f.id===id?{...f,pago:!f.pago}:f));
-    const delMes=id=>salvarMes(m.fixas.filter(f=>f.id!==id));
-    const toggleGlobal=id=>{setDb(prev=>{const p=garantirMes(prev,mes);const cur=p.meses[mes].fixasGlobaisPagas||[];const novas=cur.includes(id)?cur.filter(x=>x!==id):[...cur,id];return{...p,meses:{...p.meses,[mes]:{...p.meses[mes],fixasGlobaisPagas:novas}}};});};
-    const desativarGlobal=id=>{setDb(prev=>({...prev,contasFixasGlobais:prev.contasFixasGlobais.map(f=>f.id===id?{...f,ativa:false}:f)}));};
-    const salvarValorMes=()=>{if(!editGlobal)return;setDb(prev=>{const p=garantirMes(prev,mes);const v={...(p.meses[mes].fixasGlobaisValores||{}),[editGlobal]:toN(editValor)};return{...p,meses:{...p.meses,[mes]:{...p.meses[mes],fixasGlobaisValores:v}}};});setEditGlobal(null);};
-    const add=()=>{if(!form.nome||!form.valor)return;if(form.fixa){const n={nome:form.nome,valor:toN(form.valor),categoria:form.categoria,vencimentoDia:form.vencimento,id:Date.now(),ativa:true};setDb(prev=>({...prev,contasFixasGlobais:[...(prev.contasFixasGlobais||[]),n]}));}else{salvarMes([...m.fixas,{...form,id:Date.now(),pago:false,valor:toN(form.valor)}]);}setForm({nome:"",valor:"",vencimento:"",categoria:"Outros",fixa:false});setModal(false);};
-    const totalPago=m.fixas.filter(f=>f.pago).reduce((s,f)=>s+toN(f.valor),0)+fg.filter(f=>pagas.includes(f.id)).reduce((s,f)=>s+toN(vm[f.id]??f.valor),0);
-    const totalPend=m.fixas.filter(f=>!f.pago).reduce((s,f)=>s+toN(f.valor),0)+fg.filter(f=>!pagas.includes(f.id)).reduce((s,f)=>s+toN(vm[f.id]??f.valor),0);
-    return h(Fragment,null,
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},h("div",null,h("div",{style:{fontSize:11,color:C.muted,fontWeight:600}},"PENDENTE"),h("div",{style:{fontSize:28,fontWeight:800,color:C.gold}},h(Val,null,fmt(totalPend)))),h(Btn,{small:true,onClick:()=>setModal(true)},h(Icon,{name:"plus",size:14,color:C.bg}),"Nova")),
-      h(Bar,{value:totalPago,max:totalPago+totalPend}),
-      h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:12,color:C.muted,marginTop:6,marginBottom:16}},h("span",null,"✓ Pago: ",h(Val,null,fmt(totalPago))),h("span",null,"Pendente: ",h(Val,null,fmt(totalPend)))),
-      fg.length>0&&h(Fragment,null,
-        h("div",{style:{fontSize:11,color:C.info,fontWeight:700,letterSpacing:1,marginBottom:8,display:"flex",alignItems:"center",gap:6}},h(Icon,{name:"repeat",size:12,color:C.info}),"RECORRENTES"),
-        fg.map(f=>{const isPago=pagas.includes(f.id);const vMes=vm[f.id]??f.valor;return h(Card,{key:f.id,style:{padding:"12px 16px",borderColor:C.info+"33"}},
-          h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
-            h("div",{style:{display:"flex",gap:10,alignItems:"center",flex:1}},h("button",{onClick:()=>toggleGlobal(f.id),style:{width:24,height:24,borderRadius:99,border:`2px solid ${isPago?C.accent:C.border}`,background:isPago?C.accent:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}},isPago&&h(Icon,{name:"check",size:12,color:C.bg})),h("div",{style:{flex:1}},h("div",{style:{fontSize:14,fontWeight:600,color:isPago?C.muted:C.text,textDecoration:isPago?"line-through":"none"}},f.nome),h("div",{style:{display:"flex",gap:6,alignItems:"center",marginTop:2}},h(Badge,{label:"recorrente",color:C.info}),vm[f.id]&&h(Badge,{label:"valor editado",color:C.gold}),f.vencimentoDia&&h("span",{style:{fontSize:11,color:C.muted}},`dia ${f.vencimentoDia}`)))),
-            h("div",{style:{display:"flex",gap:6,alignItems:"center",flexShrink:0}},h("span",{style:{fontSize:15,fontWeight:700,color:isPago?C.muted:C.gold}},h(Val,null,fmt(vMes))),h("button",{onClick:()=>{setEditGlobal(f.id);setEditValor(String(vMes));},style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"edit",size:14,color:C.muted})),h("button",{onClick:()=>desativarGlobal(f.id),style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"trash",size:14,color:C.muted})))
-          )
-        );})
-      ),
-      ["Pendentes","Pagas"].map(grupo=>{const lista=m.fixas.filter(f=>grupo==="Pendentes"?!f.pago:f.pago);if(!lista.length)return null;return h("div",{key:grupo},h("div",{style:{fontSize:11,color:C.muted,fontWeight:700,letterSpacing:1,marginBottom:8,marginTop:8}},`${grupo.toUpperCase()} (este mês)`),lista.map(f=>h(Card,{key:f.id,style:{padding:"12px 16px"}},h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},h("div",{style:{display:"flex",gap:10,alignItems:"center"}},h("button",{onClick:()=>toggleMes(f.id),style:{width:24,height:24,borderRadius:99,border:`2px solid ${f.pago?C.accent:C.border}`,background:f.pago?C.accent:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}},f.pago&&h(Icon,{name:"check",size:12,color:C.bg})),h("div",null,h("div",{style:{fontSize:14,fontWeight:600,color:f.pago?C.muted:C.text,textDecoration:f.pago?"line-through":"none"}},f.nome),f.vencimento&&h("div",{style:{fontSize:11,color:C.muted}},`vence: ${f.vencimento}`))),h("div",{style:{display:"flex",gap:8,alignItems:"center"}},h("span",{style:{fontSize:15,fontWeight:700,color:f.pago?C.muted:C.gold}},h(Val,null,fmt(f.valor))),h("button",{onClick:()=>delMes(f.id),style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"trash",size:14,color:C.muted})))))));}).filter(Boolean),
-      m.fixas.length===0&&fg.length===0&&h("div",{style:{textAlign:"center",padding:"32px 0",color:C.muted}},"Nenhuma conta cadastrada"),
-      modal&&h(Modal,{title:"Nova Conta",onClose:()=>setModal(false)},h(Inp,{label:"Nome",value:form.nome,onChange:ev=>setForm({...form,nome:ev.target.value})}),h(NInp,{label:"Valor base (R$)",value:form.valor,onChange:ev=>setForm({...form,valor:ev.target.value})}),h(Inp,{label:form.fixa?"Dia do vencimento (ex: 10)":"Data de vencimento",type:form.fixa?"text":"date",value:form.vencimento,onChange:ev=>setForm({...form,vencimento:ev.target.value})}),h(Sel,{label:"Categoria",value:form.categoria,onChange:ev=>setForm({...form,categoria:ev.target.value})},FCATS.map(c=>h("option",{key:c},c))),h("button",{onClick:()=>setForm({...form,fixa:!form.fixa}),style:{width:"100%",background:form.fixa?C.infoDim:C.subtle,border:`1px solid ${form.fixa?C.info:C.border}`,borderRadius:12,padding:"12px 16px",cursor:"pointer",marginBottom:14,display:"flex",alignItems:"center",gap:10}},h("div",{style:{width:20,height:20,borderRadius:99,background:form.fixa?C.info:C.subtle,border:`2px solid ${form.fixa?C.info:C.border}`,display:"flex",alignItems:"center",justifyContent:"center"}},form.fixa&&h(Icon,{name:"check",size:12,color:C.bg})),h("div",{style:{textAlign:"left"}},h("div",{style:{fontSize:14,fontWeight:600,color:form.fixa?C.info:C.muted}},"Conta recorrente (todo mês)"),h("div",{style:{fontSize:12,color:C.muted}},"Você pode ajustar o valor a cada mês"))),h(Btn,{onClick:add},"Adicionar")),
-      editGlobal&&h(Modal,{title:"Valor deste mês",onClose:()=>setEditGlobal(null)},h("div",{style:{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.6}},"Altere apenas para ",h("b",{style:{color:C.text}},ymLabel(mes)),"."),h(NInp,{label:"Valor este mês (R$)",value:editValor,onChange:ev=>setEditValor(ev.target.value)}),h(Btn,{onClick:salvarValorMes},"Salvar para este mês"))
-    );
-  }
-
-  function SubEntradas(){
-    const[modal,setModal]=useState(false);
-    const[form,setForm]=useState({valor:"",descricao:"",data:todayStr()});
-    const entradas=m.entradas||[];
-    const total=entradas.reduce((s,e)=>s+toN(e.valor),0);
-    const add=()=>{if(!form.valor)return;const e={...form,id:Date.now(),valor:toN(form.valor)};setDb(prev=>{const p=garantirMes(prev,mes);return{...p,meses:{...p.meses,[mes]:{...p.meses[mes],entradas:[e,...(p.meses[mes].entradas||[])]}}};});setForm({valor:"",descricao:"",data:todayStr()});setModal(false);};
-    const del=id=>{setDb(prev=>{const p=garantirMes(prev,mes);return{...p,meses:{...p.meses,[mes]:{...p.meses[mes],entradas:(p.meses[mes].entradas||[]).filter(e=>e.id!==id)}}};});};
-    return h(Fragment,null,
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},h("div",null,h("div",{style:{fontSize:11,color:C.muted,fontWeight:600}},"RECEITAS EXTRAS"),h("div",{style:{fontSize:28,fontWeight:800,color:C.green}},h(Val,null,fmt(total)))),h(Btn,{small:true,onClick:()=>setModal(true)},h(Icon,{name:"plus",size:14,color:C.bg}),"Registrar")),
-      h(Card,{style:{background:C.greenDim,borderColor:C.green+"44",marginBottom:16}},h("div",{style:{fontSize:13,color:C.green,lineHeight:1.5}},"💡 Registre aqui dinheiro extra que entrou: freelance, bônus, presente, vendas. Soma automaticamente ao saldo disponível.")),
-      entradas.length===0&&h("div",{style:{textAlign:"center",padding:"32px 0",color:C.muted}},"Nenhuma entrada registrada"),
-      entradas.map(e=>h("div",{key:e.id,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:`1px solid ${C.border}`}},h("div",null,h("div",{style:{fontSize:14,fontWeight:600}},e.descricao||"Entrada"),h("div",{style:{fontSize:12,color:C.muted}},e.data)),h("div",{style:{display:"flex",gap:10,alignItems:"center"}},h("span",{style:{fontSize:15,fontWeight:700,color:C.green}},h(Val,null,`+${fmt(e.valor)}`)),h("button",{onClick:()=>del(e.id),style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"trash",size:15,color:C.muted}))))),
-      modal&&h(Modal,{title:"Registrar Entrada",onClose:()=>setModal(false)},h(NInp,{label:"Valor (R$)",placeholder:"0,00",value:form.valor,onChange:ev=>setForm({...form,valor:ev.target.value})}),h(Inp,{label:"Descrição",placeholder:"Ex: Freelance, bônus, venda",value:form.descricao,onChange:ev=>setForm({...form,descricao:ev.target.value})}),h(Inp,{label:"Data",type:"date",value:form.data,max:todayStr(),onChange:ev=>setForm({...form,data:ev.target.value})}),h(Btn,{onClick:add},"Adicionar Entrada"))
-    );
-  }
-
-  return h("div",null,
-    h("div",{style:{display:"flex",background:C.subtle,borderRadius:12,padding:4,marginBottom:20,gap:4}},
-      [["gastos","💸 Gastos"],["contas","🏠 Contas"],["entradas","💚 Entradas"]].map(([id,label])=>
-        h("button",{key:id,onClick:()=>setSubAba(id),style:{flex:1,padding:"9px 4px",borderRadius:9,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:subAba===id?C.card:"transparent",color:subAba===id?C.text:C.muted,transition:"all 0.2s"}},label)
-      )
-    ),
-    subAba==="gastos"&&h(SubGastos,null),
-    subAba==="contas"&&h(SubContas,null),
-    subAba==="entradas"&&h(SubEntradas,null)
-  );
-}
-
-// ─── RACHAR CONTA ──────────────────────────────────────────────────────────
-function RachaContaModal({gasto,onSalvar,onClose}){
-  const[pessoas,setPessoas]=useState(gasto.racha?gasto.racha.pessoas:[{nome:"",valor:"",pago:false}]);
-  const[quemPagou,setQuemPagou]=useState(gasto.racha?.quemPagou||"");
-  const totalRacha=pessoas.reduce((s,p)=>s+toN(p.valor),0);const totalGasto=toN(gasto.valor);const diff=totalGasto-totalRacha;
-  const addPessoa=()=>setPessoas([...pessoas,{nome:"",valor:"",pago:false}]);
-  const upd=(i,campo,val)=>setPessoas(pessoas.map((p,idx)=>idx===i?{...p,[campo]:val}:p));
-  const delP=i=>setPessoas(pessoas.filter((_,idx)=>idx!==i));
-  const dividirIgual=()=>{if(!pessoas.length)return;const cada=(totalGasto/pessoas.length).toFixed(2);setPessoas(pessoas.map(p=>({...p,valor:cada})));};
-  const salvar=()=>{const pv=pessoas.filter(p=>p.nome.trim());if(!pv.length)return;onSalvar({...gasto,racha:{quemPagou,pessoas:pv}});onClose();};
-  const pendentes=pessoas.filter(p=>!p.pago&&p.nome.trim());
-  const totalRecebido=pessoas.filter(p=>p.pago&&p.nome.trim()).reduce((s,p)=>s+toN(p.valor),0);
-  return h("div",null,
-    h("div",{style:{background:C.subtle,borderRadius:12,padding:"12px 14px",marginBottom:16}},h("div",{style:{fontSize:12,color:C.muted,marginBottom:2}},"Gasto total"),h("div",{style:{fontSize:22,fontWeight:800,color:C.warn}},fmt(gasto.valor)),h("div",{style:{fontSize:13,color:C.muted}},`${gasto.descricao||gasto.categoria} · ${gasto.data}`)),
-    h(Inp,{label:"Quem pagou a conta?",placeholder:"Ex: João",value:quemPagou,onChange:ev=>setQuemPagou(ev.target.value)}),
-    h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}},h("div",{style:{fontSize:12,color:C.muted,fontWeight:600}},"QUEM DEVE PAGAR"),h("button",{onClick:dividirIgual,style:{background:C.infoDim,border:`1px solid ${C.info}`,borderRadius:8,padding:"4px 10px",fontSize:12,color:C.info,cursor:"pointer",fontWeight:600}},"÷ Dividir igual")),
-    pessoas.map((p,i)=>h("div",{key:i,style:{display:"flex",gap:8,alignItems:"center",marginBottom:10}},h("button",{onClick:()=>upd(i,"pago",!p.pago),style:{width:24,height:24,borderRadius:99,flexShrink:0,border:`2px solid ${p.pago?C.accent:C.border}`,background:p.pago?C.accent:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}},p.pago&&h(Icon,{name:"check",size:12,color:C.bg})),h("input",{placeholder:"Nome",value:p.nome,onChange:ev=>upd(i,"nome",ev.target.value),style:{flex:2,background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",color:p.pago?C.muted:C.text,fontSize:14,outline:"none",textDecoration:p.pago?"line-through":"none"}}),h("input",{inputMode:"decimal",pattern:"[0-9]*[.,]?[0-9]*",placeholder:"R$",value:p.valor,onChange:ev=>upd(i,"valor",ev.target.value),style:{flex:1,background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",color:p.pago?C.muted:C.text,fontSize:14,outline:"none"}}),h("button",{onClick:()=>delP(i),style:{background:"none",border:"none",cursor:"pointer",flexShrink:0}},h(Icon,{name:"trash",size:15,color:C.muted})))),
-    h("button",{onClick:addPessoa,style:{width:"100%",background:"none",border:`1px dashed ${C.border}`,borderRadius:10,padding:"10px",fontSize:13,color:C.muted,cursor:"pointer",marginBottom:14}},"+ Adicionar pessoa"),
-    pessoas.length>0&&h("div",{style:{background:C.subtle,borderRadius:12,padding:"12px 14px",marginBottom:16}},h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}},h("span",{style:{color:C.muted}},"Total distribuído"),h("span",{style:{fontWeight:700,color:Math.abs(diff)<0.01?C.accent:C.warn}},fmt(totalRacha))),Math.abs(diff)>0.01&&h("div",{style:{fontSize:12,color:C.warn}},diff>0?`Faltam ${fmt(diff)} distribuir`:`${fmt(Math.abs(diff))} a mais`),h("div",{style:{borderTop:`1px solid ${C.border}`,marginTop:8,paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:13}},h("span",{style:{color:C.muted}},"✓ Recebido"),h("span",{style:{fontWeight:700,color:C.accent}},fmt(totalRecebido))),pendentes.length>0&&h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:13,marginTop:4}},h("span",{style:{color:C.muted}},`⏳ Pendente (${pendentes.length})`),h("span",{style:{fontWeight:700,color:C.gold}},fmt(pendentes.reduce((s,p)=>s+toN(p.valor),0))))),
-    h(Btn,{onClick:salvar},"Salvar divisão")
-  );
-}
-
-// ─── DÍVIDAS + PARCELAMENTOS ───────────────────────────────────────────────
-function Dividas({db,setDb,mes}){
-  const[subAba,setSubAba]=useState("dividas");
-
-  function SubDividas(){
-    const[modal,setModal]=useState(false);const[editId,setEditId]=useState(null);
-    const[form,setForm]=useState({nome:"",parcela:"",parcelas:"",juros:"",vencimento:""});
-    const salvarDividas=dividas=>setDb(prev=>({...prev,dividas}));
-    const add=()=>{if(!form.nome||!form.parcela||!form.parcelas)return;const parcela=toN(form.parcela);const parcelas=Math.round(toN(form.parcelas));if(editId){salvarDividas((db.dividas||[]).map(d=>d.id===editId?{...d,...form,parcela,parcelas,parcelasOrig:d.parcelasOrig||parcelas}:d));setEditId(null);}else{salvarDividas([...(db.dividas||[]),{...form,id:Date.now(),parcela,parcelas,parcelasOrig:parcelas}]);}setForm({nome:"",parcela:"",parcelas:"",juros:"",vencimento:""});setModal(false);};
-    const pagar=id=>{const d=(db.dividas||[]).find(x=>x.id===id);if(!d||d.parcelas<=0)return;setDb(prev=>{const p=garantirMes(prev,mes);const m=p.meses[mes];const pp=[...(m.parcelasPagas||[]),{id:Date.now(),dividaId:id,valor:d.parcela,nome:d.nome}];const nd=prev.dividas.map(x=>x.id===id?{...x,parcelas:x.parcelas-1}:x);return{...p,dividas:nd,meses:{...p.meses,[mes]:{...m,parcelasPagas:pp}}};});};
-    const desfazer=id=>{setDb(prev=>{const p=garantirMes(prev,mes);const m=p.meses[mes];const pp=[...(m.parcelasPagas||[])];const idx=pp.map(x=>x.dividaId).lastIndexOf(id);if(idx===-1)return prev;pp.splice(idx,1);const nd=prev.dividas.map(x=>x.id===id?{...x,parcelas:x.parcelas+1}:x);return{...p,dividas:nd,meses:{...p.meses,[mes]:{...m,parcelasPagas:pp}}};});};
-    const del=id=>salvarDividas((db.dividas||[]).filter(d=>d.id!==id));
-    const ativas=(db.dividas||[]).filter(d=>d.parcelas>0);const quitadas=(db.dividas||[]).filter(d=>d.parcelas<=0);
-    const totalGeral=ativas.reduce((s,d)=>s+toN(d.parcela)*d.parcelas,0);
-    const totalPrev=form.parcela&&form.parcelas?toN(form.parcela)*toN(form.parcelas):null;
-    const pagasMes=(db.meses?.[mes]?.parcelasPagas)||[];const pagasPorDivida=id=>pagasMes.filter(p=>p.dividaId===id).length;
-    return h(Fragment,null,
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},h("div",null,h("div",{style:{fontSize:11,color:C.muted,fontWeight:600}},"TOTAL EM DÍVIDAS"),h("div",{style:{fontSize:28,fontWeight:800,color:C.warn}},h(Val,null,fmt(totalGeral)))),h(Btn,{small:true,onClick:()=>{setEditId(null);setForm({nome:"",parcela:"",parcelas:"",juros:"",vencimento:""});setModal(true);}},h(Icon,{name:"plus",size:14,color:C.bg}),"Nova")),
-      ativas.map(d=>{const orig=d.parcelasOrig||d.parcelas;const nP=pagasPorDivida(d.id);return h(Card,{key:d.id},h("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:10}},h("div",null,h("div",{style:{fontSize:16,fontWeight:700}},d.nome),d.juros&&h(Badge,{label:`${d.juros}% a.m.`,color:C.warn})),h("div",{style:{display:"flex",gap:8}},h("button",{onClick:()=>{setForm({nome:d.nome,parcela:String(d.parcela),parcelas:String(d.parcelas),juros:d.juros||"",vencimento:d.vencimento||""});setEditId(d.id);setModal(true);},style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"edit",size:15,color:C.muted})),h("button",{onClick:()=>del(d.id),style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"trash",size:15,color:C.muted})))),h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}},h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"PARCELA"),h("div",{style:{fontSize:15,fontWeight:700}},h(Val,null,fmt(d.parcela)))),h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"RESTAM"),h("div",{style:{fontSize:15,fontWeight:700,color:C.gold}},`${d.parcelas}x`)),h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"TOTAL"),h("div",{style:{fontSize:15,fontWeight:700,color:C.warn}},h(Val,null,fmt(toN(d.parcela)*d.parcelas))))),d.vencimento&&h("div",{style:{fontSize:12,color:C.muted,marginBottom:8}},`próximo venc.: ${d.vencimento}`),h(Bar,{value:orig-d.parcelas,max:orig,color:C.accent}),h("div",{style:{fontSize:11,color:C.muted,marginTop:4,marginBottom:10}},`${orig-d.parcelas} de ${orig} pagas`),nP>0&&h("div",{style:{fontSize:12,color:C.accent,marginBottom:8}},`✓ ${nP} parcela(s) paga(s) este mês`),h("div",{style:{display:"flex",gap:8}},h(Btn,{small:true,onClick:()=>pagar(d.id),style:{color:C.accent,background:C.accentDim,flex:1}},"✓ Paguei esta parcela"),nP>0&&h(Btn,{small:true,onClick:()=>desfazer(d.id),variant:"ghost",style:{flex:1}},"↩ Desfazer")));}),
-      quitadas.length>0&&h("div",{style:{marginTop:8}},h("div",{style:{fontSize:11,color:C.muted,fontWeight:700,letterSpacing:1,marginBottom:8}},"QUITADAS"),quitadas.map(d=>h(Card,{key:d.id,style:{opacity:.5,padding:"10px 16px"}},h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},h("div",null,h("div",{style:{fontSize:14,fontWeight:600,color:C.muted,textDecoration:"line-through"}},d.nome),h("div",{style:{fontSize:12,color:C.accent}},"✓ Quitada")),h("button",{onClick:()=>del(d.id),style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"trash",size:14,color:C.muted})))))),
-      (db.dividas||[]).length===0&&h("div",{style:{textAlign:"center",padding:"40px 0",color:C.muted}},h("div",{style:{fontSize:40}},"🎉"),h("div",{style:{marginTop:8}},"Nenhuma dívida registrada!")),
-      modal&&h(Modal,{title:editId?"Editar Dívida":"Nova Dívida",onClose:()=>{setModal(false);setEditId(null);}},h(Inp,{label:"Nome (ex: Advogado, Empréstimo)",value:form.nome,onChange:ev=>setForm({...form,nome:ev.target.value})}),h(NInp,{label:"Valor da parcela (R$)",value:form.parcela,onChange:ev=>setForm({...form,parcela:ev.target.value})}),h(NInp,{label:"Parcelas restantes",value:form.parcelas,onChange:ev=>setForm({...form,parcelas:ev.target.value})}),totalPrev&&!editId&&h("div",{style:{background:C.warnDim,borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:14,color:C.warn}},"Total calculado: ",h("b",null,fmt(totalPrev))),h(NInp,{label:"Juros (% a.m.) — opcional",value:form.juros,onChange:ev=>setForm({...form,juros:ev.target.value})}),h(Inp,{label:"Próximo vencimento — opcional",type:"date",value:form.vencimento,onChange:ev=>setForm({...form,vencimento:ev.target.value})}),h(Btn,{onClick:add},editId?"Salvar Alterações":"Adicionar Dívida"))
-    );
-  }
-
-  function SubParcelamentos(){
-    const[modal,setModal]=useState(false);const[editId,setEditId]=useState(null);
-    const[form,setForm]=useState({nome:"",valor:"",totalParcelas:"",parcelaAtual:"",vencimento:""});
-    const parcelamentos=db.parcelamentos||[];
-    const salvar=p=>setDb(prev=>({...prev,parcelamentos:p}));
-    const add=()=>{
-      if(!form.nome||!form.valor||!form.totalParcelas)return;
-      const valorParc=toN(form.valor)/Math.max(1,toN(form.totalParcelas));
-      const obj={nome:form.nome,valorTotal:toN(form.valor),totalParcelas:Math.round(toN(form.totalParcelas)),parcelaAtual:Math.max(1,Math.round(toN(form.parcelaAtual)||1)),valorParcela:valorParc,vencimento:form.vencimento,id:editId||Date.now()};
-      if(editId){salvar(parcelamentos.map(p=>p.id===editId?obj:p));setEditId(null);}
-      else{salvar([...parcelamentos,obj]);}
-      setForm({nome:"",valor:"",totalParcelas:"",parcelaAtual:"",vencimento:""});setModal(false);
-    };
-    const avancar=id=>{salvar(parcelamentos.map(p=>p.id===id?{...p,parcelaAtual:Math.min(p.parcelaAtual+1,p.totalParcelas)}:p));};
-    const del=id=>salvar(parcelamentos.filter(p=>p.id!==id));
-    const ativos=parcelamentos.filter(p=>p.parcelaAtual<=p.totalParcelas);
-    const concluidos=parcelamentos.filter(p=>p.parcelaAtual>p.totalParcelas);
-    const totalMensal=ativos.reduce((s,p)=>s+p.valorParcela,0);
-    return h(Fragment,null,
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},h("div",null,h("div",{style:{fontSize:11,color:C.muted,fontWeight:600}},"PARCELAS DO MÊS"),h("div",{style:{fontSize:28,fontWeight:800,color:C.purple}},h(Val,null,fmt(totalMensal)))),h(Btn,{small:true,onClick:()=>{setEditId(null);setForm({nome:"",valor:"",totalParcelas:"",parcelaAtual:"",vencimento:""});setModal(true);}},h(Icon,{name:"plus",size:14,color:C.bg}),"Novo")),
-      h(Card,{style:{background:C.purpleDim,borderColor:C.purple+"44",marginBottom:16}},h("div",{style:{fontSize:13,color:C.purple,lineHeight:1.5}},h(Icon,{name:"card",size:14,color:C.purple})," Parcelamentos do cartão são apenas para visualização. Não afetam o saldo disponível, pois já estão embutidos na fatura.")),
-      ativos.length===0&&h("div",{style:{textAlign:"center",padding:"32px 0",color:C.muted}},"Nenhum parcelamento cadastrado"),
-      ativos.map(p=>{const restantes=p.totalParcelas-p.parcelaAtual+1;return h(Card,{key:p.id,style:{borderColor:C.purple+"33"}},
-        h("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:10}},
-          h("div",null,h("div",{style:{fontSize:15,fontWeight:700}},p.nome),h(Badge,{label:`${p.parcelaAtual}/${p.totalParcelas}`,color:C.purple})),
-          h("div",{style:{display:"flex",gap:8}},h("button",{onClick:()=>{setForm({nome:p.nome,valor:String(p.valorTotal),totalParcelas:String(p.totalParcelas),parcelaAtual:String(p.parcelaAtual),vencimento:p.vencimento||""});setEditId(p.id);setModal(true);},style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"edit",size:15,color:C.muted})),h("button",{onClick:()=>del(p.id),style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"trash",size:15,color:C.muted})))
-        ),
-        h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}},
-          h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"PARCELA"),h("div",{style:{fontSize:15,fontWeight:700,color:C.purple}},h(Val,null,fmt(p.valorParcela)))),
-          h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"RESTAM"),h("div",{style:{fontSize:15,fontWeight:700}},`${restantes}x`)),
-          h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"TOTAL"),h("div",{style:{fontSize:15,fontWeight:700}},h(Val,null,fmt(p.valorTotal))))
-        ),
-        p.vencimento&&h("div",{style:{fontSize:12,color:C.muted,marginBottom:8}},`vence dia: ${p.vencimento}`),
-        h(Bar,{value:p.parcelaAtual-1,max:p.totalParcelas,color:C.purple}),
-        h("div",{style:{fontSize:11,color:C.muted,marginTop:4,marginBottom:10}},`${p.parcelaAtual-1} de ${p.totalParcelas} pagas`),
-        h(Btn,{small:true,onClick:()=>avancar(p.id),style:{color:C.purple,background:C.purpleDim,width:"100%"}},"✓ Avançar para próxima parcela")
-      );}),
-      concluidos.length>0&&h("div",{style:{marginTop:8}},h("div",{style:{fontSize:11,color:C.muted,fontWeight:700,letterSpacing:1,marginBottom:8}},"CONCLUÍDOS"),concluidos.map(p=>h(Card,{key:p.id,style:{opacity:.5,padding:"10px 16px"}},h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},h("div",null,h("div",{style:{fontSize:14,fontWeight:600,color:C.muted,textDecoration:"line-through"}},p.nome),h("div",{style:{fontSize:12,color:C.purple}},"✓ Quitado")),h("button",{onClick:()=>del(p.id),style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"trash",size:14,color:C.muted})))))),
-      modal&&h(Modal,{title:editId?"Editar Parcelamento":"Novo Parcelamento",onClose:()=>{setModal(false);setEditId(null);}},
-        h(Inp,{label:"Nome (ex: TV Samsung, iPhone)",value:form.nome,onChange:ev=>setForm({...form,nome:ev.target.value})}),
-        h(NInp,{label:"Valor total da compra (R$)",value:form.valor,onChange:ev=>setForm({...form,valor:ev.target.value})}),
-        h(NInp,{label:"Total de parcelas",value:form.totalParcelas,onChange:ev=>setForm({...form,totalParcelas:ev.target.value})}),
-        h(NInp,{label:"Parcela atual (qual está pagando agora)",value:form.parcelaAtual,onChange:ev=>setForm({...form,parcelaAtual:ev.target.value})}),
-        form.valor&&form.totalParcelas&&h("div",{style:{background:C.purpleDim,borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:14,color:C.purple}},"Parcela mensal: ",h("b",null,fmt(toN(form.valor)/Math.max(1,toN(form.totalParcelas))))),
-        h(Inp,{label:"Dia do vencimento — opcional",placeholder:"Ex: 15",value:form.vencimento,onChange:ev=>setForm({...form,vencimento:ev.target.value})}),
-        h(Btn,{onClick:add},editId?"Salvar":"Adicionar Parcelamento")
-      )
-    );
-  }
-
-  return h("div",null,
-    h("div",{style:{display:"flex",background:C.subtle,borderRadius:12,padding:4,marginBottom:20,gap:4}},
-      [["dividas","💳 Dívidas"],["parcelamentos","🛒 Parcelamentos"]].map(([id,label])=>
-        h("button",{key:id,onClick:()=>setSubAba(id),style:{flex:1,padding:"9px 4px",borderRadius:9,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,background:subAba===id?C.card:"transparent",color:subAba===id?C.text:C.muted,transition:"all 0.2s"}},label)
-      )
-    ),
-    subAba==="dividas"&&h(SubDividas,null),
-    subAba==="parcelamentos"&&h(SubParcelamentos,null)
-  );
-}
-
-// ─── FINANÇAS (Invest + Reserva + Metas) ──────────────────────────────────
-function InvestMetas({db,setDb}){
-  const[subAba,setSubAba]=useState("invest");
-  function SubInvest(){
-    const[modal,setModal]=useState(false);const[form,setForm]=useState({ticker:"",cotas:"",precoMedio:"",rendaMensal:""});
-    const[editandoFII,setEditandoFII]=useState(null); // FII sendo editado
-    const[adicionarCotas,setAdicionarCotas]=useState(""); // cotas extras a adicionar
-    const salvar=inv=>setDb(prev=>({...prev,investimentos:inv}));
-    const add=()=>{if(!form.ticker||!form.cotas)return;salvar([...(db.investimentos||[]),{...form,id:Date.now(),cotas:toN(form.cotas),precoMedio:toN(form.precoMedio),rendaMensal:toN(form.rendaMensal)}]);setForm({ticker:"",cotas:"",precoMedio:"",rendaMensal:""});setModal(false);};
-    const salvarEdicaoFII=(inv)=>{salvar((db.investimentos||[]).map(i=>i.id===inv.id?inv:i));setEditandoFII(null);setAdicionarCotas("");};
-    const totalP=(db.investimentos||[]).reduce((s,i)=>s+toN(i.cotas)*toN(i.precoMedio),0);const totalR=(db.investimentos||[]).reduce((s,i)=>s+toN(i.rendaMensal),0);const yld=totalP>0?((totalR*12)/totalP*100).toFixed(2):"0.00";
-    return h(Fragment,null,
-      h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}},h(Card,{style:{marginBottom:0,borderColor:C.info+"44"}},h("div",{style:{fontSize:11,color:C.muted,fontWeight:600}},"PATRIMÔNIO"),h("div",{style:{fontSize:18,fontWeight:800,color:C.info}},h(Val,null,fmt(totalP)))),h(Card,{style:{marginBottom:0,borderColor:C.accent+"44"}},h("div",{style:{fontSize:11,color:C.muted,fontWeight:600}},"RENDA/MÊS"),h("div",{style:{fontSize:18,fontWeight:800,color:C.accent}},h(Val,null,fmt(totalR))),h("div",{style:{fontSize:11,color:C.muted}},`${yld}% a.a.`))),
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}},h("span",{style:{fontSize:14,fontWeight:700}},"FIIs e Ações"),h(Btn,{small:true,onClick:()=>setModal(true)},h(Icon,{name:"plus",size:14,color:C.bg}),"Adicionar")),
-      (db.investimentos||[]).map(inv=>{
-        const p=toN(inv.cotas)*toN(inv.precoMedio);const y=p>0?((toN(inv.rendaMensal)/p)*100).toFixed(2):"0.00";const r10=toN(inv.cotas)>0?(toN(inv.rendaMensal)/toN(inv.cotas))*10:0;
-        return h(Card,{key:inv.id},
-          h("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:10}},
-            h("div",null,h("div",{style:{fontSize:18,fontWeight:800,color:C.info}},inv.ticker),h(Badge,{label:`${y}% a.m.`,color:C.accent})),
-            h("div",{style:{display:"flex",gap:8}},
-              h("button",{onClick:()=>setEditandoFII(inv),style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"edit",size:15,color:C.muted})),
-              h("button",{onClick:()=>salvar((db.investimentos||[]).filter(x=>x.id!==inv.id)),style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"trash",size:16,color:C.muted}))
-            )
-          ),
-          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}},
-            h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"COTAS"),h("div",{style:{fontSize:14,fontWeight:700}},inv.cotas)),
-            h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"PREÇO MÉD."),h("div",{style:{fontSize:14,fontWeight:700}},h(Val,null,fmt(inv.precoMedio)))),
-            h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"RENDA/MÊS"),h("div",{style:{fontSize:14,fontWeight:700,color:C.accent}},h(Val,null,fmt(inv.rendaMensal))))
-          ),
-          toN(inv.rendaMensal)>0&&h("div",{style:{background:C.infoDim,borderRadius:10,padding:"10px 12px",fontSize:12,color:C.info}},`📈 +10 cotas → renda estimada sobe ${fmt(r10)}/mês · Ano: ${fmt(toN(inv.rendaMensal)*12)} *`)
-        );
-      }),
-      (db.investimentos||[]).length===0&&h("div",{style:{textAlign:"center",padding:"32px 0",color:C.muted}},"Nenhum investimento cadastrado"),
-      (db.investimentos||[]).length>0&&h("div",{style:{borderTop:`1px solid ${C.border}`,marginTop:8,paddingTop:12,fontSize:11,color:C.muted,lineHeight:1.6}},
-        "* Estimativas calculadas com base na renda mensal informada pelo usuário. Não constituem recomendação de investimento. Rentabilidade passada não garante resultados futuros."
-      ),
-      modal&&h(Modal,{title:"Novo FII / Ação",onClose:()=>setModal(false)},h(Inp,{label:"Ticker (ex: MXRF11, PETR4)",value:form.ticker,onChange:ev=>setForm({...form,ticker:ev.target.value.toUpperCase()})}),h(NInp,{label:"Quantidade de cotas",value:form.cotas,onChange:ev=>setForm({...form,cotas:ev.target.value})}),h(NInp,{label:"Preço médio (R$)",value:form.precoMedio,onChange:ev=>setForm({...form,precoMedio:ev.target.value})}),h(NInp,{label:"Renda mensal (R$)",value:form.rendaMensal,onChange:ev=>setForm({...form,rendaMensal:ev.target.value})}),h(Btn,{onClick:add},"Adicionar")),
-      // Modal editar FII
-      editandoFII&&h(Modal,{title:`Editar ${editandoFII.ticker}`,onClose:()=>{setEditandoFII(null);setAdicionarCotas("");}},
-        h("div",{style:{background:C.infoDim,borderRadius:12,padding:"12px 14px",marginBottom:16,fontSize:13,color:C.info}},"Atualize os dados ou adicione mais cotas compradas no mês."),
-        h(NInp,{label:"Total de cotas (atual)",value:String(editandoFII.cotas),onChange:ev=>setEditandoFII({...editandoFII,cotas:ev.target.value})}),
-        h(NInp,{label:"Preço médio (R$)",value:String(editandoFII.precoMedio),onChange:ev=>setEditandoFII({...editandoFII,precoMedio:ev.target.value})}),
-        h(NInp,{label:"Renda mensal atual (R$)",value:String(editandoFII.rendaMensal),onChange:ev=>setEditandoFII({...editandoFII,rendaMensal:ev.target.value})}),
-        h("div",{style:{borderTop:`1px solid ${C.border}`,paddingTop:14,marginTop:4}},
-          h("div",{style:{fontSize:12,color:C.muted,marginBottom:6,fontWeight:600}},"ADICIONAR COTAS COMPRADAS"),
-          h("div",{style:{display:"flex",gap:8}},
-            h("input",{inputMode:"decimal",placeholder:"Qtd de novas cotas",value:adicionarCotas,onChange:ev=>setAdicionarCotas(ev.target.value),style:{flex:1,background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",color:C.text,fontSize:14,outline:"none"}}),
-            h("button",{onClick:()=>{if(adicionarCotas){setEditandoFII({...editandoFII,cotas:toN(editandoFII.cotas)+toN(adicionarCotas)});setAdicionarCotas("");}},style:{background:C.info,color:C.bg,border:"none",borderRadius:10,padding:"10px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}},"+")
-          ),
-          adicionarCotas&&h("div",{style:{fontSize:12,color:C.info,marginTop:6}},`Total ficará: ${toN(editandoFII.cotas)+toN(adicionarCotas)} cotas`)
-        ),
-        h(Btn,{onClick:()=>salvarEdicaoFII({...editandoFII,cotas:toN(editandoFII.cotas),precoMedio:toN(editandoFII.precoMedio),rendaMensal:toN(editandoFII.rendaMensal)})},"Salvar alterações")
-      )
-    );
-  }
-  function SubReserva(){
-    const[modal,setModal]=useState(false);const[form,setForm]=useState({nome:"",valor:"",tipo:"Emergência"});
-    const reservas=db.reservas||[];const total=reservas.reduce((s,r)=>s+toN(r.valor),0);
-    const salvar=res=>setDb(prev=>({...prev,reservas:res}));
-    const add=()=>{if(!form.nome||!form.valor)return;salvar([...reservas,{...form,id:Date.now(),valor:toN(form.valor)}]);setForm({nome:"",valor:"",tipo:"Emergência"});setModal(false);};
-    const del=id=>salvar(reservas.filter(r=>r.id!==id));
-    const editar=(id,v)=>salvar(reservas.map(r=>r.id===id?{...r,valor:toN(v)}:r));
-    return h(Fragment,null,
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},h("div",null,h("div",{style:{fontSize:11,color:C.muted,fontWeight:600}},"TOTAL GUARDADO"),h("div",{style:{fontSize:28,fontWeight:800,color:C.green}},h(Val,null,fmt(total)))),h(Btn,{small:true,onClick:()=>setModal(true)},h(Icon,{name:"plus",size:14,color:C.bg}),"Adicionar")),
-      h(Card,{style:{background:C.greenDim,borderColor:C.green+"44",marginBottom:16}},h("div",{style:{fontSize:13,color:C.green,lineHeight:1.5}},"🏦 Registre aqui reserva de emergência, poupança e outros objetivos de curto prazo.")),
-      reservas.length===0&&h("div",{style:{textAlign:"center",padding:"32px 0",color:C.muted}},"Nenhuma reserva cadastrada"),
-      reservas.map(r=>h(Card,{key:r.id},h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}},h("div",null,h("div",{style:{fontSize:15,fontWeight:700}},r.nome),h(Badge,{label:r.tipo,color:C.green})),h("button",{onClick:()=>del(r.id),style:{background:"none",border:"none",cursor:"pointer"}},h(Icon,{name:"trash",size:15,color:C.muted}))),h("div",{style:{fontSize:24,fontWeight:800,color:C.green,marginBottom:10}},h(Val,null,fmt(r.valor))),h("div",{style:{display:"flex",gap:8}},h("input",{inputMode:"decimal",placeholder:"Atualizar valor",style:{flex:1,background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 12px",color:C.text,fontSize:13,outline:"none"},onBlur:ev=>{if(ev.target.value){editar(r.id,ev.target.value);ev.target.value="";}}}),h("button",{onClick:ev=>{const v=ev.currentTarget.previousSibling.value;if(v){editar(r.id,v);ev.currentTarget.previousSibling.value="";}},style:{background:C.green,color:C.bg,border:"none",borderRadius:10,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}},"OK")))),
-      modal&&h(Modal,{title:"Nova Reserva",onClose:()=>setModal(false)},h(Inp,{label:"Nome",value:form.nome,onChange:ev=>setForm({...form,nome:ev.target.value})}),h(NInp,{label:"Valor atual (R$)",value:form.valor,onChange:ev=>setForm({...form,valor:ev.target.value})}),h(Sel,{label:"Tipo",value:form.tipo,onChange:ev=>setForm({...form,tipo:ev.target.value})},["Emergência","Poupança","Viagem","Outro objetivo"].map(t=>h("option",{key:t},t))),h(Btn,{onClick:add},"Adicionar Reserva"))
-    );
-  }
-  function SubMetas(){
-    const[modal,setModal]=useState(false);const[form,setForm]=useState({nome:"",alvo:"",atual:"",prazo:"",tipo:"curto"});
-    const salvar=metas=>setDb(prev=>({...prev,metas}));
-    const add=()=>{if(!form.nome||!form.alvo)return;salvar([...(db.metas||[]),{...form,id:Date.now(),alvo:toN(form.alvo),atual:toN(form.atual)}]);setForm({nome:"",alvo:"",atual:"",prazo:"",tipo:"curto"});setModal(false);};
-    const upd=(id,v)=>salvar((db.metas||[]).map(m=>m.id===id?{...m,atual:toN(v)}:m));
-    const TL={curto:"Curto prazo",medio:"Médio prazo",longo:"Longo prazo"};const TC={curto:C.warn,medio:C.gold,longo:C.accent};
-    return h(Fragment,null,
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},h("span",{style:{fontSize:18,fontWeight:800}},"Metas"),h(Btn,{small:true,onClick:()=>setModal(true)},h(Icon,{name:"plus",size:14,color:C.bg}),"Nova")),
-      ["curto","medio","longo"].map(tipo=>{
-        const lista=(db.metas||[]).filter(m=>m.tipo===tipo);
-        if(!lista.length)return null;
-        return h("div",{key:tipo},
-          h("div",{style:{fontSize:11,color:TC[tipo],fontWeight:700,letterSpacing:1,marginBottom:8}},TL[tipo].toUpperCase()),
-          lista.map(m=>{
-            const pct=Math.min(100,(m.atual/m.alvo)*100);
-            const falta=Math.max(0,m.alvo-m.atual);
-            const mesesAte=m.prazo?Math.ceil((new Date(m.prazo)-new Date())/(30*86400000)):null;
-            const porMes=mesesAte&&mesesAte>0?falta/mesesAte:null;
-            return h(Card,{key:m.id},
-              h("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:8}},
-                h("div",null,
-                  h("div",{style:{fontSize:15,fontWeight:700}},m.nome),
-                  h(Badge,{label:TL[m.tipo],color:TC[m.tipo]})
-                ),
-                h("button",{onClick:()=>salvar((db.metas||[]).filter(x=>x.id!==m.id)),style:{background:"none",border:"none",cursor:"pointer"}},
-                  h(Icon,{name:"trash",size:15,color:C.muted})
-                )
-              ),
-              h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:13,color:C.muted,marginBottom:6}},
-                h("span",null,h(Val,null,fmt(m.atual))," guardado"),
-                h("span",null,"Meta: ",h(Val,null,fmt(m.alvo)))
-              ),
-              h(Bar,{value:m.atual,max:m.alvo,color:TC[m.tipo]}),
-              h("div",{style:{fontSize:13,color:C.muted,marginTop:8}},
-                `${pct.toFixed(0)}% · falta `,h(Val,null,fmt(falta)),
-                porMes&&h("span",{style:{color:TC[m.tipo]}},` · guardar ${fmt(porMes)}/mês`)
-              ),
-              h("div",{style:{display:"flex",gap:8,marginTop:10}},
-                h("input",{inputMode:"decimal",pattern:"[0-9]*[.,]?[0-9]*",placeholder:"Atualizar valor atual",
-                  style:{flex:1,background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 12px",color:C.text,fontSize:13,outline:"none"},
-                  onBlur:ev=>{if(ev.target.value)upd(m.id,ev.target.value);}}),
-                h("button",{onClick:ev=>{const v=ev.currentTarget.previousSibling.value;if(v)upd(m.id,v);},
-                  style:{background:TC[m.tipo],color:C.bg,border:"none",borderRadius:10,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}},
-                  "OK"
-                )
-              )
-            );
-          })
-        );
-      }).filter(Boolean),
-      (db.metas||[]).length===0&&h("div",{style:{textAlign:"center",padding:"40px 0",color:C.muted}},h("div",{style:{fontSize:40}},"🎯"),h("div",{style:{marginTop:8}},"Defina suas primeiras metas")),
-      modal&&h(Modal,{title:"Nova Meta",onClose:()=>setModal(false)},h(Inp,{label:"Nome",placeholder:"Ex: Pagar cartão, Juntar R$5.000",value:form.nome,onChange:ev=>setForm({...form,nome:ev.target.value})}),h(NInp,{label:"Valor alvo (R$)",value:form.alvo,onChange:ev=>setForm({...form,alvo:ev.target.value})}),h(NInp,{label:"Quanto já tem (R$)",value:form.atual,onChange:ev=>setForm({...form,atual:ev.target.value})}),h(Inp,{label:"Prazo (data)",type:"date",value:form.prazo,onChange:ev=>setForm({...form,prazo:ev.target.value})}),h(Sel,{label:"Tipo",value:form.tipo,onChange:ev=>setForm({...form,tipo:ev.target.value})},h("option",{value:"curto"},"Curto prazo"),h("option",{value:"medio"},"Médio prazo"),h("option",{value:"longo"},"Longo prazo")),h(Btn,{onClick:add},"Criar Meta"))
-    );
-  }
-  return h("div",null,
-    h("div",{style:{display:"flex",background:C.subtle,borderRadius:12,padding:4,marginBottom:20,gap:4}},[["invest","📈 FIIs/Ações"],["reserva","🏦 Reserva"],["metas","🎯 Metas"]].map(([id,label])=>h("button",{key:id,onClick:()=>setSubAba(id),style:{flex:1,padding:"9px 4px",borderRadius:9,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:subAba===id?C.card:"transparent",color:subAba===id?C.text:C.muted,transition:"all 0.2s"}},label))),
-    subAba==="invest"&&h(SubInvest,null),subAba==="reserva"&&h(SubReserva,null),subAba==="metas"&&h(SubMetas,null)
-  );
-}
-
-// ─── HISTÓRICO ─────────────────────────────────────────────────────────────
-function Historico({db,setMes,setTab}){
-  const meses=Object.keys(db.meses||{}).sort().reverse();
-  return h("div",null,
-    h("div",{style:{fontSize:13,color:C.muted,lineHeight:1.6,marginBottom:16}},"Gastos e contas são separados por mês. Dívidas, FIIs e metas valem para todos os meses."),
-    meses.length===0&&h("div",{style:{textAlign:"center",padding:"32px 0",color:C.muted}},"Nenhum mês registrado ainda"),
-    meses.map(ym=>{
-      const m=db.meses[ym];const fg=(db.contasFixasGlobais||[]).filter(f=>f.ativa!==false);const vm=m.fixasGlobaisValores||{};
-      const gastosAvista=m.gastos.filter(g=>g.pagamento!=="cartao").reduce((s,g)=>s+toN(g.valor),0);
-      const gastosCartao=m.gastos.filter(g=>g.pagamento==="cartao").reduce((s,g)=>s+toN(g.valor),0);
-      const totalEntradas=(m.entradas||[]).reduce((s,e)=>s+toN(e.valor),0);
-      const fixasPagas=m.fixas.filter(f=>f.pago).reduce((s,f)=>s+toN(f.valor),0)+fg.filter(f=>(m.fixasGlobaisPagas||[]).includes(f.id)).reduce((s,f)=>s+toN(vm[f.id]??f.valor),0);
-      const parcelasMes=(m.parcelasPagas||[]).reduce((s,p)=>s+toN(p.valor),0);
-      const saldo=toN(m.saldoBase)+totalEntradas-fixasPagas-gastosAvista-parcelasMes;
-      return h(Card,{key:ym,onClick:()=>{setMes(ym);setTab("home");},style:{borderColor:ym===ymNow()?C.accent+"66":C.border}},
-        h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
-          h("div",{style:{fontSize:15,fontWeight:700,textTransform:"capitalize"}},ymLabel(ym)),
-          h("div",{style:{display:"flex",gap:6,alignItems:"center"}},ym===ymNow()&&h(Badge,{label:"atual",color:C.accent}),h("span",{style:{fontSize:13,fontWeight:700,color:saldo<0?C.warn:C.accent}},h(Val,null,fmt(saldo))))
-        ),
-        h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}},
-          h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"À VISTA"),h("div",{style:{fontSize:13,fontWeight:700,color:C.warn}},h(Val,null,fmt(gastosAvista)))),
-          h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"CARTÃO"),h("div",{style:{fontSize:13,fontWeight:700,color:C.purple}},h(Val,null,fmt(gastosCartao)))),
-          h("div",null,h("div",{style:{fontSize:10,color:C.muted}},"ENTRADAS"),h("div",{style:{fontSize:13,fontWeight:700,color:C.green}},h(Val,null,fmt(totalEntradas))))
-        )
-      );
-    })
-  );
-}
-
-// ─── EDITAR PERFIL ─────────────────────────────────────────────────────────
-function ModalEditarPerfil({perfil,onSalvar,onSair}){
-  const[nome,setNome]=useState(perfil.nome);const[senhaAtual,setSenhaAtual]=useState("");const[novaSenha,setNovaSenha]=useState("");
-  const[cor,setCor]=useState(perfil.cor||AVATAR_CORES[0]);const[foto,setFoto]=useState(perfil.foto||null);
-  const[erro,setErro]=useState("");const[sucesso,setSucesso]=useState("");const[trocandoSenha,setTrocandoSenha]=useState(false);
-  const[bioDisp,setBioDisp]=useState(false);const[bioAtivo,setBioAtivo]=useState(temBiometrico(perfil.id));const[bioLoading,setBioLoading]=useState(false);
-  useEffect(()=>{biometricDisponivel().then(ok=>setBioDisp(ok));}, []);
-  const escolherFoto=ev=>{const f=ev.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=e=>setFoto(e.target.result);r.readAsDataURL(f);};
-  const salvar=()=>{
-    setErro("");setSucesso("");
-    if(nome.trim().length<2){setErro("Nome precisa ter ao menos 2 letras.");return;}
-    if(trocandoSenha){if(hashSenha(senhaAtual)!==perfil.senhaHash){setErro("Senha atual incorreta.");return;}if(novaSenha.length<4){setErro("Nova senha precisa ter ao menos 4 caracteres.");return;}}
-    const campos={nome:nome.trim(),cor,foto};if(trocandoSenha)campos.senhaHash=hashSenha(novaSenha);
-    onSalvar(campos);setSucesso("Perfil atualizado!");setSenhaAtual("");setNovaSenha("");setTrocandoSenha(false);
-  };
-  const ativarBio=async()=>{
-    setBioLoading(true);
-    const ok=await registrarBiometrico(perfil.id,perfil.nome);
-    setBioLoading(false);
-    if(ok){setBioAtivo(true);setSucesso("Face ID / biometria ativado!");}
-    else setErro("Não foi possível ativar. Verifique as permissões do navegador.");
-  };
-  const desativarBio=()=>{localStorage.removeItem(BIOMETRIC_KEY+perfil.id);setBioAtivo(false);setSucesso("Biometria desativada.");};
-  const preview={nome,cor,foto};
-  return h("div",null,
-    h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:20}},h("div",{style:{position:"relative",marginBottom:8}},h(Avatar,{perfil:preview,size:80}),h("label",{style:{position:"absolute",bottom:0,right:0,width:28,height:28,borderRadius:"50%",background:C.card,border:`2px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:14}},"📷",h("input",{type:"file",accept:"image/*",onChange:escolherFoto,style:{display:"none"}})))),
-    h(Inp,{label:"Nome",value:nome,onChange:ev=>setNome(ev.target.value)}),
-    h("div",{style:{marginBottom:16}},h("div",{style:{fontSize:12,color:C.muted,marginBottom:8,fontWeight:600}},"COR DO AVATAR"),h("div",{style:{display:"flex",gap:8,flexWrap:"wrap"}},...AVATAR_CORES.map(cl=>h("button",{key:cl,onClick:()=>setCor(cl),style:{width:32,height:32,borderRadius:"50%",background:cl,border:`3px solid ${cor===cl?C.text:"transparent"}`,cursor:"pointer"}})))),
-    // Face ID / Biometria
-    bioDisp&&h("div",{style:{marginBottom:16}},
-      h("div",{style:{fontSize:12,color:C.muted,marginBottom:8,fontWeight:600}},"FACE ID / BIOMETRIA"),
-      bioAtivo
-        ?h("div",null,h("div",{style:{background:C.accentDim,border:`1px solid ${C.accent}`,borderRadius:12,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:8}},h(Icon,{name:"faceId",size:18,color:C.accent}),h("span",{style:{fontSize:14,color:C.accent,fontWeight:600}},"Face ID ativado")),h(Btn,{variant:"ghost",onClick:desativarBio,style:{color:C.warn}},"Desativar Face ID"))
-        :h(Btn,{onClick:ativarBio,style:{background:C.infoDim,color:C.info,border:`1px solid ${C.info}`}},h(Icon,{name:"faceId",size:16,color:C.info}),bioLoading?"Aguardando biometria...":"Ativar Face ID")
-    ),
-    h("button",{onClick:()=>setTrocandoSenha(!trocandoSenha),style:{width:"100%",background:trocandoSenha?C.infoDim:C.subtle,border:`1px solid ${trocandoSenha?C.info:C.border}`,borderRadius:12,padding:"12px 16px",cursor:"pointer",marginBottom:trocandoSenha?12:16,display:"flex",alignItems:"center",gap:8,color:trocandoSenha?C.info:C.muted,fontSize:14,fontWeight:600}},`🔒 ${trocandoSenha?"Cancelar":"Alterar senha"}`),
-    trocandoSenha&&h("div",{style:{marginBottom:16}},h("div",{style:{marginBottom:10}},h("div",{style:{fontSize:12,color:C.muted,marginBottom:6,fontWeight:600}},"SENHA ATUAL"),h("input",{type:"password",placeholder:"••••••",value:senhaAtual,onChange:ev=>setSenhaAtual(ev.target.value),style:{width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:15,outline:"none",boxSizing:"border-box"}})),h("div",null,h("div",{style:{fontSize:12,color:C.muted,marginBottom:6,fontWeight:600}},"NOVA SENHA"),h("input",{type:"password",placeholder:"Mínimo 4 caracteres",value:novaSenha,onChange:ev=>setNovaSenha(ev.target.value),style:{width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:15,outline:"none",boxSizing:"border-box"}}))),
-    erro&&h("div",{style:{color:C.warn,fontSize:13,marginBottom:12,textAlign:"center"}},erro),
-    sucesso&&h("div",{style:{color:C.accent,fontSize:13,marginBottom:12,textAlign:"center"}},`✓ ${sucesso}`),
-    h(Btn,{onClick:salvar},"Salvar alterações"),
-    h(Btn,{variant:"ghost",onClick:onSair,style:{marginTop:8,color:C.warn}},h(Icon,{name:"logout",size:15,color:C.warn}),"Trocar de perfil"),
-    h("div",{style:{borderTop:`1px solid ${C.border}`,marginTop:20,paddingTop:16}},
-      h("div",{style:{fontSize:11,color:C.muted,marginBottom:10,textAlign:"center",letterSpacing:1,fontWeight:600}},"ZONA DE PERIGO"),
-      h(Btn,{variant:"danger",onClick:()=>{
-        if(window.confirm(`Tem certeza que quer excluir o perfil "${perfil.nome}"?
-
-Esta ação não pode ser desfeita.`)){
-          onExcluirConta();
-        }
-      },style:{fontSize:13}},
-        h(Icon,{name:"trash",size:14,color:"#fff"}),"Excluir este perfil"
-      ),
-      h("div",{style:{fontSize:11,color:C.muted,marginTop:8,textAlign:"center",lineHeight:1.5}},"Todos os seus dados financeiros serão removidos permanentemente.")
-    )
-  );
-}
-
-// ─── PAINEL ADMIN ─────────────────────────────────────────────────────────────
-const ADMIN_SENHA=APP.adminPassword; // ← troque em APP_CONFIGS quando quiser
-const ADMIN_SENHAS_COMPATIVEIS=["acue2024admin","bemestar2026admin"];
-
-function TelaAdmin({perfis,onFechar}){
-  const[autenticado,setAutenticado]=useState(false);
-  const[senha,setSenha]=useState("");
-  const[erro,setErro]=useState(false);
-  const[stats,setStats]=useState([]);
-  const[loading,setLoading]=useState(false);
-  const[metrics,setMetrics]=useState({ativosHoje:0,ativos7d:0,ativos30d:0,sessoes30d:0,loginTaxa:0,bioTaxa:0,topAbas:[]});
-  const[aggregateOnly,setAggregateOnly]=useState(localStorage.getItem(LS_ADMIN_PRIVACY_KEY)!=="false");
-
-  const entrar=()=>{
-    if(senha===ADMIN_SENHA||ADMIN_SENHAS_COMPATIVEIS.includes(senha)){setAutenticado(true);carregarStats();}
-    else{setErro(true);setSenha("");}
-  };
-
-  const carregarStats=async()=>{
-    setLoading(true);
-    try{
-      let dadosList=[];
-      const usage=carregarUso();
-      const usageMap=usage.profiles||{};
-      const daily=usage.daily||{};
-      const tabViews=usage.tabViews||{};
-      if(OFFLINE_MODE){
-        const raw=localStorage.getItem(LS_DADOS_KEY);
-        const all=raw?JSON.parse(raw):{};
-        dadosList=Object.entries(all).map(([perfil_id,dados])=>({perfil_id,dados,atualizado_em:null}));
-      }else{
-        const res=await sb.from("dados_financeiros").select("perfil_id,dados,atualizado_em");
-        dadosList=res.data||[];
-      }
-      const statsArr=perfis.map(p=>{
-        const d=dadosList?.find(x=>x.perfil_id===p.id);
-        const dados=d?.dados||{};
-        const meses=Object.keys(dados.meses||{}).length;
-        const uso=usageMap[p.id]||{};
-        const ultimoFonte=uso.ultimoAcesso||d?.atualizado_em||null;
-        const ultimoAcesso=ultimoFonte?new Date(ultimoFonte).toLocaleString("pt-BR"):"-";
-        return{id:p.id,nome:p.nome,username:p.username||"-",meses,acessos:uso.acessos||0,ultimoAcesso,ativo:meses>0||!!ultimoFonte};
-      });
-      setStats(statsArr);
-      const now=Date.now();
-      const dayMs=86400000;
-      const ativosHoje=statsArr.filter(s=>usageMap[s.id]?.ultimoAcesso&&(now-new Date(usageMap[s.id].ultimoAcesso).getTime())<dayMs).length;
-      const ativos7d=statsArr.filter(s=>usageMap[s.id]?.ultimoAcesso&&(now-new Date(usageMap[s.id].ultimoAcesso).getTime())<7*dayMs).length;
-      const ativos30d=statsArr.filter(s=>usageMap[s.id]?.ultimoAcesso&&(now-new Date(usageMap[s.id].ultimoAcesso).getTime())<30*dayMs).length;
-      const dias30=Object.keys(daily).filter(d=>(now-new Date(d+"T00:00:00").getTime())<30*dayMs);
-      const soma=(k)=>dias30.reduce((acc,d)=>acc+Number(daily[d]?.[k]||0),0);
-      const loginSucesso=soma("loginSucesso"),loginFalha=soma("loginFalha");
-      const bioSucesso=soma("bioSucesso"),bioFalha=soma("bioFalha");
-      const sessoes30d=statsArr.reduce((acc,s)=>acc+Number(s.acessos||0),0);
-      const topAbas=Object.entries(tabViews).sort((a,b)=>b[1]-a[1]).slice(0,5);
-      setMetrics({
-        ativosHoje,ativos7d,ativos30d,sessoes30d,
-        loginTaxa:(loginSucesso+loginFalha)?Math.round((loginSucesso/(loginSucesso+loginFalha))*100):0,
-        bioTaxa:(bioSucesso+bioFalha)?Math.round((bioSucesso/(bioSucesso+bioFalha))*100):0,
-        topAbas
-      });
-    }catch(e){console.error(e);}
-    setLoading(false);
-  };
-
-  if(!autenticado)return h("div",{style:{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32}},
-    h("div",{style:{fontSize:28,marginBottom:8}},"🔐"),
-    h("div",{style:{fontSize:18,fontWeight:700,color:C.text,marginBottom:4}},"Painel Admin"),
-    h("div",{style:{fontSize:13,color:C.muted,marginBottom:32}},"Acesso restrito"),
-    h("div",{style:{width:"100%",maxWidth:320}},
-      h("input",{type:"password",placeholder:"Senha admin",value:senha,
-        onChange:ev=>{setSenha(ev.target.value);setErro(false);},
-        onKeyDown:ev=>ev.key==="Enter"&&entrar(),autoFocus:true,
-        style:{width:"100%",background:C.card,border:`2px solid ${erro?C.warn:senha?C.accent:C.border}`,
-          borderRadius:12,padding:"14px 16px",color:C.text,fontSize:16,outline:"none",
-          boxSizing:"border-box",marginBottom:8,textAlign:"center",letterSpacing:4}}),
-      erro&&h("div",{style:{color:C.warn,fontSize:13,marginBottom:8,textAlign:"center"}},"Senha incorreta."),
-      h(Btn,{onClick:entrar},"Entrar"),
-      h(Btn,{variant:"ghost",onClick:onFechar,style:{marginTop:8}},"← Voltar")
-    )
-  );
-
-  return h("div",{style:{background:C.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto",color:C.text,paddingBottom:40}},
-    h("div",{style:{position:"sticky",top:0,background:C.bg+"EE",backdropFilter:"blur(20px)",
-      borderBottom:`1px solid ${C.border}`,padding:"env(safe-area-inset-top,12px) 16px 12px"}},
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
-        h("div",null,
-          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,letterSpacing:1}},"PAINEL"),
-          h("div",{style:{fontSize:19,fontWeight:800,letterSpacing:-0.5}},"Admin")
-        ),
-        h("button",{onClick:onFechar,style:{background:C.subtle,border:"none",borderRadius:10,
-          padding:"8px 14px",cursor:"pointer",color:C.muted,fontSize:13,fontWeight:600}},"← Sair")
-      )
-    ),
-    h("div",{style:{padding:16}},
-      h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}},
-        h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16}},
-          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}},"PERFIS ATIVOS"),
-          h("div",{style:{fontSize:28,fontWeight:800,color:C.accent}},perfis.length)
-        ),
-        h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16}},
-          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}},"USANDO O APP"),
-          h("div",{style:{fontSize:28,fontWeight:800,color:C.info}},loading?"...":stats.filter(s=>s.ativo).length)
-        )
-      ),
-      h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}},
-        h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14}},
-          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}},"ATIVOS"),
-          h("div",{style:{fontSize:12,color:C.text}},`Hoje: ${metrics.ativosHoje} | 7d: ${metrics.ativos7d} | 30d: ${metrics.ativos30d}`)
-        ),
-        h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14}},
-          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}},"TAXAS DE ACESSO"),
-          h("div",{style:{fontSize:12,color:C.text}},`Login: ${metrics.loginTaxa}% | Face ID: ${metrics.bioTaxa}%`)
-        )
-      ),
-      h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}},
-        h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14}},
-          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}},"ONBOARDING"),
-          h("div",{style:{fontSize:12,color:C.text}},`Username definido: ${perfis.filter(p=>normalizarUsuario(p.username)).length}/${perfis.length}`)
-        ),
-        h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14}},
-          h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}},"BIOMETRIA"),
-          h("div",{style:{fontSize:12,color:C.text}},`Face ID ativo: ${perfis.filter(p=>temBiometrico(p.id)).length}/${perfis.length}`)
-        )
-      ),
-      h("div",{style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14,marginBottom:12}},
-        h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,marginBottom:6}},"ABAS MAIS USADAS"),
-        metrics.topAbas.length
-          ?metrics.topAbas.map(([aba,qtd])=>h("div",{key:aba,style:{fontSize:12,color:C.text,marginBottom:4}},`${aba}: ${qtd}`))
-          :h("div",{style:{fontSize:12,color:C.muted}},"Sem dados ainda")
-      ),
-      h("div",{style:{background:C.infoDim,border:`1px solid ${C.info}`,borderRadius:12,padding:"10px 12px",marginBottom:12,fontSize:12,color:C.info}},
-        "Painel de uso sem dados financeiros: apenas métricas de acesso e navegação."
-      ),
-      h("label",{style:{display:"flex",alignItems:"center",gap:8,fontSize:12,color:C.muted,marginBottom:12,cursor:"pointer"}},
-        h("input",{type:"checkbox",checked:aggregateOnly,onChange:ev=>{const v=ev.target.checked;setAggregateOnly(v);localStorage.setItem(LS_ADMIN_PRIVACY_KEY,v?"true":"false");}}),
-        "Modo privacidade agregada (oculta lista por perfil)"
-      ),
-      h("div",{style:{fontSize:11,color:C.muted,fontWeight:600,letterSpacing:1,marginBottom:12}},"USUÁRIOS"),
-      loading
-        ?h("div",{style:{textAlign:"center",padding:32,color:C.muted}},"Carregando...")
-        :!aggregateOnly&&stats.map((s,i)=>h("div",{key:s.id,style:{background:C.card,border:`1px solid ${C.border}`,
-            borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}},
-            h("div",{style:{width:10,height:10,borderRadius:"50%",flexShrink:0,background:s.ativo?C.accent:C.subtle}}),
-            h("div",{style:{flex:1}},
-              h("div",{style:{fontSize:14,fontWeight:600}},`Perfil #${i+1}`),
-              h("div",{style:{fontSize:12,color:C.muted,marginTop:2}},
-                s.ativo?`${s.meses} mês(es) registrado(s) · acessos: ${s.acessos} · último acesso: ${s.ultimoAcesso}`:"Sem dados ainda"
-              )
-            ),
-            s.ativo&&h("span",{style:{background:C.accentDim,borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,color:C.accent}},"ativo")
-          ))
-    )
-  );
-}
-
-// ─── APP PRINCIPAL ─────────────────────────────────────────────────────────
-const TABS=[
-  {id:"home",   label:"Início",  icon:"home"},
-  {id:"gastos", label:"Dados",   icon:"wallet"},
-  {id:"dividas",label:"Dívidas", icon:"alert"},
-  {id:"invest", label:"Finanças",icon:"trend"},
-  {id:"hist",   label:"Histórico",icon:"hist"},
+const PR_DEFAULT = [
+{ id:1, exercicio:“Agachamento”, peso:“120kg” },
+{ id:2, exercicio:“Levantamento Terra”, peso:“150kg” },
+{ id:3, exercicio:“Clean”, peso:“80kg” },
 ];
-const ABAS_MENSAIS=["home","gastos"];
 
-function AppPrincipal({db,setDb,perfil,onSair,onEditarPerfil,onExcluirPerfil}){
-  const[tab,setTab]=useState("home");
-  const[mes,setMes]=useState(ymNow);
-  const[showPerfil,setShowPerfil]=useState(false);
-  const[hidden,setHidden]=useState(false);
-  const tabLabel=TABS.find(t=>t.id===tab)?.label;
-  const screens={
-    home:   h(Dashboard,   {db,setDb,mes}),
-    gastos: h(GastosContas,{db,setDb,mes}),
-    dividas:h(Dividas,     {db,setDb,mes}),
-    invest: h(InvestMetas, {db,setDb}),
-    hist:   h(Historico,   {db,setDb,setMes,setTab}),
-  };
-  const pwa=usePWAInstall();
-  useEffect(()=>{if(tab)registrarUsoAba(tab);},[tab]);
-  return h(HiddenCtx.Provider,{value:{hidden,toggle:()=>setHidden(h=>!h)}},
-    h("div",{style:{background:C.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto",color:C.text,paddingBottom:90}},
-      h(PWABanner,{...pwa}),
-      // Header
-      h("div",{style:{position:"sticky",top:0,zIndex:50,background:C.bg+"EE",backdropFilter:"blur(20px)",borderBottom:`1px solid ${C.border}`,paddingTop:"env(safe-area-inset-top, 12px)"}},
-        h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px 0"}},
-          h("button",{onClick:()=>setShowPerfil(true),style:{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:8,padding:0}},
-            h(Avatar,{perfil,size:32}),
-            h("span",{style:{fontSize:13,fontWeight:600,color:C.text}},perfil.nome)
-          ),
-          h("div",{style:{display:"flex",alignItems:"center",gap:8}},
-            // Botão olhinho
-            h("button",{onClick:()=>setHidden(v=>!v),style:{background:hidden?C.accentDim:C.subtle,border:`1px solid ${hidden?C.accent:C.border}`,borderRadius:8,padding:"6px 8px",cursor:"pointer",display:"flex",alignItems:"center",gap:4}},
-              h(Icon,{name:hidden?"eyeOff":"eye",size:16,color:hidden?C.accent:C.muted})
-            ),
-            ABAS_MENSAIS.includes(tab)
-              ?h(MesSeletor,{mes,setMes,db,setDb})
-              :h("div",{style:{fontSize:13,color:C.muted}},new Date().toLocaleDateString("pt-BR",{month:"short",day:"numeric"}))
-          )
-        ),
-        h("div",{style:{padding:"6px 16px 12px",fontSize:19,fontWeight:800,letterSpacing:-0.5}},tabLabel)
-      ),
-      h("div",{style:{padding:"16px 16px 0"}},screens[tab]),
-      // Bottom nav
-      h("div",{style:{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:C.card+"F2",backdropFilter:"blur(20px)",borderTop:`1px solid ${C.border}`,paddingBottom:"env(safe-area-inset-bottom, 8px)"}},
-        h("div",{style:{display:"flex",padding:"8px 0 4px"}},
-          TABS.map(t=>h("button",{key:t.id,onClick:()=>setTab(t.id),style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,background:"none",border:"none",cursor:"pointer",padding:"6px 0"}},
-            h(Icon,{name:t.icon,size:20,color:tab===t.id?C.accent:C.muted}),
-            h("span",{style:{fontSize:9,fontWeight:600,color:tab===t.id?C.accent:C.muted}},t.label)
-          ))
-        )
-      ),
-      showPerfil&&h(Modal,{title:"Meu perfil",onClose:()=>setShowPerfil(false)},
-        h(ModalEditarPerfil,{perfil,
-          onSalvar:campos=>{onEditarPerfil(campos);setShowPerfil(false);},
-          onSair:()=>{setShowPerfil(false);onSair();},
-          onExcluirConta:()=>{
-            if(window.confirm(`Tem certeza que quer excluir o perfil "${perfil.nome}"? Esta ação não pode ser desfeita.`)){
-              onExcluirPerfil(perfil.id);
-              setShowPerfil(false);
-              onSair();
-            }
-          }
-        })
-      )
-    )
-  );
+const gerarAulas = () => {
+const hoje = getDiaSemana() || “Seg”;
+const horarios = getHorariosDia(hoje);
+return horarios.map((h,i)=>({
+id:i+1, hora:h, dia:“Hoje”,
+nome: h.includes(“12”)?“WOD Almoço”: h<“10:00”?“WOD Matinal”:“WOD Principal”,
+coach:[“Rafael”,“Camila”,“Thiago”][i%3],
+vagas:15, ocupadas:[3,8,12,5,7,10,13,6,4][i]||5,
+}));
+};
+
+const AULAS = gerarAulas();
+
+const ADMIN_ALUNOS = [
+{ id:1, nome:“Lucas Mendes”,    plano:“Mensal”,    status:“ativo”,  venc:“30/04”, checkins:12, isento:false },
+{ id:2, nome:“Ana Paula Silva”, plano:“Trimestral”,status:“ativo”,  venc:“15/06”, checkins:16, isento:true  },
+{ id:3, nome:“Carlos Rocha”,    plano:“Mensal”,    status:“vencido”,venc:“01/04”, checkins:4,  isento:false },
+{ id:4, nome:“Fernanda Lima”,   plano:“Mensal”,    status:“ativo”,  venc:“22/04”, checkins:15, isento:true  },
+{ id:5, nome:“Marcos Souza”,    plano:“Anual”,     status:“ativo”,  venc:“10/12”, checkins:9,  isento:false },
+{ id:6, nome:“Beatriz Costa”,   plano:“Mensal”,    status:“ativo”,  venc:“28/04”, checkins:7,  isento:false },
+];
+
+const ESPERA_INIT = [
+{ id:1, nome:“Pedro Alves”,    aula:“WOD Principal 18:30”, tipo:“espera”,        status:“pendente”, hora:“14:22” },
+{ id:2, nome:“Juliana Matos”,  aula:“Aula Experimental”,   tipo:“experimental”,  status:“pendente”, hora:“13:05” },
+{ id:3, nome:“Ricardo Lima”,   aula:“WOD Matinal 05:30”,   tipo:“espera”,        status:“pendente”, hora:“11:47” },
+{ id:4, nome:“Camila Torres”,  aula:“Aula Experimental”,   tipo:“experimental”,  status:“pendente”, hora:“10:30” },
+];
+
+/* ─── ICONS ──────────────────────────────────────────────────── */
+const P = {
+home:    “M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.6 5.4 21 6 21H9M19 10L21 12M19 10V20C19 20.6 18.6 21 18 21H15M9 21C9 21 9 15 12 15C15 15 15 21 15 21M9 21H15”,
+calendar:“M8 2V6M16 2V6M3 10H21M5 4H19C20.1 4 21 4.9 21 6V20C21 21.1 20.1 22 19 22H5C3.9 22 3 21.1 3 20V6C3 4.9 3.9 4 5 4Z”,
+person:  “M20 21V19C20 16.8 18.2 15 16 15H8C5.8 15 4 16.8 4 19V21M12 11C14.2 11 16 9.2 16 7C16 4.8 14.2 3 12 3C9.8 3 8 4.8 8 7C8 9.2 9.8 11 12 11Z”,
+bell:    “M18 8A6 6 0 006 8C6 15 3 17 3 17H21S18 15 18 8ZM13.73 21A2 2 0 0110.27 21”,
+check:   “M9 12L11 14L15 10M21 12C21 16.97 16.97 21 12 21C7.03 21 3 16.97 3 12C3 7.03 7.03 3 12 3C16.97 3 21 7.03 21 12Z”,
+fire:    “M12 2C6 8 6 13 9 16C9 13 11 11 12 10C12 13 14 15 14 17C17 15 18 11 15 7C15 10 13 11 12 13C11 11 13 7 12 2Z”,
+users:   “M17 21V19C17 16.8 15.2 15 13 15H5C2.8 15 1 16.8 1 19V21M23 21V19C23 17.1 21.7 15.5 20 15.1M16 3.1C17.7 3.5 19 5.1 19 7S17.7 10.5 16 10.9M13 7C13 9.2 11.2 11 9 11C6.8 11 5 9.2 5 7S6.8 3 9 3S13 4.8 13 7Z”,
+x:       “M18 6L6 18M6 6L18 18”,
+lock:    “M19 11H5C3.9 11 3 11.9 3 13V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V13C21 11.9 20.1 11 19 11ZM12 17C11.4 17 11 16.6 11 16S11.4 15 12 15S13 15.4 13 16S12.6 17 12 17ZM17 11V7C17 4.2 14.8 2 12 2S7 4.2 7 7V11”,
+arrow:   “M19 12H5M12 5L5 12L12 19”,
+share:   “M8.59 13.51L15.42 17.49M15.41 6.51L8.59 10.49M21 5C21 6.66 19.66 8 18 8S15 6.66 15 5 16.34 2 18 2 21 3.34 21 5ZM9 12C9 13.66 7.66 15 6 15S3 13.66 3 12 4.34 9 6 9 9 10.34 9 12ZM21 19C21 20.66 19.66 22 18 22S15 20.66 15 19 16.34 16 18 16 21 17.34 21 19Z”,
+star:    “M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z”,
+list:    “M9 6H20M9 12H20M9 18H20M5 6V6.01M5 12V12.01M5 18V18.01”,
+chart:   “M18 20V10M12 20V4M6 20V14”,
+};
+const Icon = ({ name, size=22, color=C.muted }) => (
+<svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+<path d={P[name]||””} />
+</svg>
+);
+
+/* ─── ATOMS ──────────────────────────────────────────────────── */
+const Tag = ({ children, color }) => (
+<span style={{
+background:color+“20”,color,border:`1px solid ${color}40`,
+borderRadius:6,fontSize:10,fontWeight:700,
+letterSpacing:1,padding:“2px 8px”,textTransform:“uppercase”,
+}}>{children}</span>
+);
+
+const Btn = ({ children, onClick, variant=“primary”, small, full, disabled }) => {
+const bg = {primary:C.accent,danger:C.red,green:C.green,ghost:C.subtle}[variant]||C.subtle;
+const fg = (variant===“primary”||variant===“green”) ? “#000”:”#fff”;
+return (
+<button onClick={onClick} disabled={disabled} style={{
+background:disabled?C.subtle:bg, color:disabled?C.muted:fg,
+border:“none”, borderRadius:10,
+padding:small?“7px 14px”:“12px 20px”,
+fontSize:small?11:13, fontWeight:800,
+letterSpacing:1, cursor:disabled?“not-allowed”:“pointer”,
+width:full?“100%”:“auto”, textTransform:“uppercase”,
+fontFamily:“inherit”, opacity:disabled?0.4:1,
+}}>{children}</button>
+);
+};
+
+const Card = ({ children, style={}, highlight }) => (
+
+  <div style={{
+    background:C.card,
+    border:`1px solid ${highlight?highlight+"55":C.border}`,
+    borderRadius:14, padding:16, marginBottom:12, ...style,
+  }}>{children}</div>
+);
+
+const Bar = ({ value, max, color=C.accent, thin }) => (
+
+  <div style={{height:thin?4:6,background:C.subtle,borderRadius:6,overflow:"hidden"}}>
+    <div style={{
+      width:`${Math.min((value/max)*100,100)}%`,height:"100%",
+      background:color,borderRadius:6,transition:"width .5s",
+    }}/>
+  </div>
+);
+
+const Divider = () => <div style={{height:1,background:C.border,margin:“12px 0”}}/>;
+
+const Avatar = ({ nome, size=36, color=C.accent }) => (
+
+  <div style={{
+    width:size,height:size,borderRadius:"50%",flexShrink:0,
+    background:color+"22",display:"flex",alignItems:"center",
+    justifyContent:"center",fontSize:size*0.4,fontWeight:900,color,
+  }}>{nome[0]}</div>
+);
+
+/* ─── INSTALL POPUP ──────────────────────────────────────────── */
+function InstallPopup({ onClose, onNever }) {
+const isIOS     = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isAndroid = /android/i.test(navigator.userAgent);
+// Se não detectar nenhum, mostra os dois
+const mostraIOS     = isIOS || (!isIOS && !isAndroid);
+const mostraAndroid = isAndroid || (!isIOS && !isAndroid);
+
+const Step = ({ n, text }) => (
+<div style={{display:“flex”,alignItems:“center”,gap:10,marginBottom:8}}>
+<div style={{width:22,height:22,borderRadius:“50%”,background:C.accent,
+color:”#000”,fontSize:11,fontWeight:900,display:“flex”,
+alignItems:“center”,justifyContent:“center”,flexShrink:0}}>{n}</div>
+<span style={{fontSize:13,color:C.text,fontWeight:600}}>{text}</span>
+</div>
+);
+
+const BlocoIOS = () => (
+<div style={{marginBottom: mostraAndroid ? 12 : 0}}>
+<div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:C.accent,
+textTransform:“uppercase”,marginBottom:8}}>📱 iPhone / iPad (Safari)</div>
+<Step n="1" text='Toque em Compartilhar na barra do Safari'/>
+<Step n="2" text='"Adicionar à Tela de Início"'/>
+<Step n="3" text='Confirme tocando em "Adicionar"'/>
+</div>
+);
+
+const BlocoAndroid = () => (
+<div>
+<div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:C.accent,
+textTransform:“uppercase”,marginBottom:8}}>🤖 Android (Chrome)</div>
+<Step n="1" text="Toque no menu (⋮) no canto superior direito"/>
+<Step n="2" text='"Adicionar à tela inicial"'/>
+<Step n="3" text="Confirme e pronto!"/>
+</div>
+);
+
+return (
+<div style={{position:“fixed”,inset:0,zIndex:999,background:“rgba(0,0,0,0.8)”,
+backdropFilter:“blur(6px)”,display:“flex”,alignItems:“flex-end”,justifyContent:“center”}}>
+<div style={{background:C.surface,borderRadius:“20px 20px 0 0”,
+border:`1px solid ${C.border}`,padding:“20px 20px 36px”,
+width:“100%”,maxWidth:430,animation:“slideUp .3s ease”}}>
+<div style={{width:40,height:4,background:C.border,borderRadius:4,margin:“0 auto 20px”}}/>
+<div style={{display:“flex”,alignItems:“center”,gap:12,marginBottom:18}}>
+<div style={{width:52,height:52,borderRadius:14,
+background:`linear-gradient(135deg,${C.accentD},${C.accent})`,
+display:“flex”,alignItems:“center”,justifyContent:“center”}}>
+<Icon name="fire" size={26} color="#000"/>
+</div>
+<div>
+<div style={{fontSize:18,fontWeight:900,color:C.accent,letterSpacing:1}}>CROSSFIT</div>
+<div style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:3}}>AMAZONAS</div>
+</div>
+</div>
+<div style={{fontSize:20,fontWeight:900,marginBottom:6}}>Adicione à tela inicial! 📲</div>
+<div style={{fontSize:13,color:C.muted,lineHeight:1.6,marginBottom:16}}>
+Acesse mais rápido e receba lembretes de aulas sem abrir o navegador.
+</div>
+<div style={{background:C.subtle,borderRadius:12,padding:14,marginBottom:18}}>
+{mostraIOS && <BlocoIOS/>}
+{mostraIOS && mostraAndroid && <div style={{height:1,background:C.border,margin:“12px 0”}}/>}
+{mostraAndroid && <BlocoAndroid/>}
+{isIOS && (
+<p style={{fontSize:11,color:C.muted,marginTop:10,fontWeight:600,lineHeight:1.5}}>
+⚠️ No iPhone, notificações só funcionam após adicionar à tela inicial.
+</p>
+)}
+</div>
+<Btn full onClick={onClose}>Entendido!</Btn>
+<button onClick={onNever} style={{background:“none”,border:“none”,color:C.muted,
+fontSize:11,fontWeight:700,cursor:“pointer”,width:“100%”,marginTop:12,
+fontFamily:“inherit”,letterSpacing:1,textTransform:“uppercase”}}>
+Não mostrar novamente
+</button>
+</div>
+<style>{`@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+</div>
+);
 }
 
-// ─── ROOT ──────────────────────────────────────────────────────────────────
-function App(){
-  const{tela,setTela,perfis,setPerfis,perfil,db,setDb,criarPerfil,editarPerfil,deletarPerfil,entrar,entrarBiometrico,entrarComUsuarioSenha,definirUsuarioAtual,sair}=useApp();
-  const[perfilSel,setPerfilSel]=useState(null);const[criando,setCriando]=useState(false);
-  const[adminAberto,setAdminAberto]=useState(false);
-  if(adminAberto)return h(TelaAdmin,{perfis,onFechar:()=>setAdminAberto(false)});
-  if(tela==="loading")return h(Spinner,{msg:"Carregando perfis..."});
-  if(tela==="carregando_dados")return h(Spinner,{msg:"Carregando seus dados..."});
-  if(tela==="erro_conexao")return h("div",{style:{background:"#000",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,gap:16}},
-    h("div",{style:{fontSize:40}},"📡"),
-    h("div",{style:{fontSize:18,fontWeight:700,color:"#F2F2F4",textAlign:"center"}},"Sem conexão"),
-    h("div",{style:{fontSize:14,color:"#6B6B7A",textAlign:"center",lineHeight:1.6}},"Não foi possível conectar ao servidor. Verifique sua internet e tente novamente."),
-    h("button",{onClick:()=>{setTela("loading");dbCarregarPerfis().then(p=>{setPerfis(p);setTela(p.length===0?"criar":"perfis");}).catch(()=>setTela("erro_conexao"));},
-      style:{background:"#00E5A0",color:"#000",border:"none",borderRadius:12,padding:"14px 32px",fontSize:15,fontWeight:700,cursor:"pointer",marginTop:8}},
-      "Tentar novamente"
-    )
-  );
-  if(criando)return h(FormCriarPerfil,{onSalvar:async(nome,username,senha,cor,foto)=>{const cod=await criarPerfil(nome,username,senha,cor,foto);return cod;},onCancelar:()=>setCriando(false)});
-  if(tela==="criar"||tela==="perfis")return h(TelaPerfis,{perfis,onSelecionar:p=>{setPerfilSel(p);setTela("senha");},onCriar:()=>setCriando(true),onAdmin:()=>setAdminAberto(true),onLoginCredenciais:entrarComUsuarioSenha});
-  if(tela==="senha"&&perfilSel)return h(TelaSenha,{perfil:perfilSel,onEntrar:entrar,onEntrarBiometrico:entrarBiometrico,onVoltar:()=>{setPerfilSel(null);setTela("perfis");}});
-  if(tela==="definir_usuario"&&perfil)return h(TelaDefinirUsuario,{perfil,onSalvar:definirUsuarioAtual,onSair:sair});
-  if(tela==="app"&&perfil)return h(AppPrincipal,{db,setDb,perfil,onSair:sair,onEditarPerfil:campos=>editarPerfil(perfil.id,campos),onExcluirPerfil:deletarPerfil});
-  return h(TelaPerfis,{perfis,onSelecionar:p=>{setPerfilSel(p);setTela("senha");},onCriar:()=>setCriando(true),onAdmin:()=>setAdminAberto(true),onLoginCredenciais:entrarComUsuarioSenha});
+/* ─── NOTIF BANNER ───────────────────────────────────────────── */
+function NotifBanner({ aula, onDismiss }) {
+return (
+<div style={{position:“fixed”,top:0,left:“50%”,transform:“translateX(-50%)”,
+width:“100%”,maxWidth:430,zIndex:500,
+background:`linear-gradient(90deg,${C.accentD},${C.accent})`,
+padding:“12px 16px”,display:“flex”,alignItems:“center”,
+justifyContent:“space-between”,animation:“slideDown .4s ease”}}>
+<div style={{display:“flex”,alignItems:“center”,gap:10}}>
+<Icon name="bell" size={18} color="#000"/>
+<div>
+<div style={{fontSize:12,fontWeight:900,color:”#000”}}>🔔 Sua aula começa em 10 min!</div>
+<div style={{fontSize:11,color:“rgba(0,0,0,0.65)”,fontWeight:700}}>
+{aula.hora} · {aula.nome} · Coach {aula.coach}
+</div>
+</div>
+</div>
+<button onClick={onDismiss} style={{background:“none”,border:“none”,cursor:“pointer”,padding:4}}>
+<Icon name="x" size={16} color="#000"/>
+</button>
+<style>{`@keyframes slideDown{from{transform:translate(-50%,-100%)}to{transform:translate(-50%,0)}}`}</style>
+</div>
+);
 }
 
-const root=ReactDOM.createRoot(document.getElementById("root"));
-root.render(h(App,null));
-</script>
-</body>
-</html>
+/* ══════════════════════════════════════════════════════════════
+TELAS DO ALUNO
+══════════════════════════════════════════════════════════════ */
+
+function HomeScreen({ reservas, setReservas, setTab, notifPerm, onAtivarNotif, prs }) {
+const proxima = AULAS.find(a=>reservas.includes(a.id));
+const { checkinsMes, meta, streak } = ALUNO;
+const atingiu = checkinsMes >= meta;
+const diasGrid = Array.from({length:20},(_,i)=>i+1);
+const presentes = [1,2,4,5,7,9,10,12,13,14,15,16];
+
+return (
+<div>
+{/* Hero */}
+<div style={{background:`linear-gradient(135deg,${C.accentD},${C.accent} 70%,#FF9500)`,
+borderRadius:18,padding:“22px 20px”,marginBottom:14,position:“relative”,overflow:“hidden”}}>
+<div style={{position:“absolute”,right:-20,top:-20,width:110,height:110,
+borderRadius:“50%”,background:“rgba(255,255,255,0.07)”}}/>
+<p style={{fontSize:11,fontWeight:700,letterSpacing:2,color:“rgba(0,0,0,0.5)”,
+textTransform:“uppercase”,marginBottom:3}}>
+{new Date().toLocaleDateString(“pt-BR”,{weekday:“long”,day:“2-digit”,month:“short”})}
+</p>
+<h1 style={{fontSize:26,fontWeight:900,color:”#000”,marginBottom:3,lineHeight:1.1}}>
+Bom dia, {ALUNO.nome.split(” “)[0]}! 🔥
+</h1>
+<p style={{fontSize:13,color:“rgba(0,0,0,0.55)”,fontWeight:600,marginBottom:16}}>
+{streak} dias seguidos · {ALUNO.plano}
+</p>
+
+```
+    {/* Barra de meta */}
+    <div style={{background:"rgba(0,0,0,0.18)",borderRadius:10,padding:"10px 14px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+        <span style={{fontSize:11,fontWeight:800,color:"rgba(0,0,0,0.6)",
+          textTransform:"uppercase",letterSpacing:1}}>
+          Check-ins em Abril
+        </span>
+        <span style={{fontSize:13,fontWeight:900,color:"#000"}}>
+          {checkinsMes}/{meta} {atingiu?"🏆":""}
+        </span>
+      </div>
+      <Bar value={checkinsMes} max={meta} color={atingiu?"rgba(0,0,0,0.6)":"rgba(0,0,0,0.4)"}/>
+      <p style={{fontSize:10,color:"rgba(0,0,0,0.5)",fontWeight:700,marginTop:6}}>
+        {atingiu
+          ? "✅ Meta atingida! Você está isento de check-in pelo resto do mês."
+          : `Faltam ${meta-checkinsMes} check-ins para ficar isento pelo resto do mês!`}
+      </p>
+    </div>
+  </div>
+
+  {/* Isenção badge */}
+  {atingiu && (
+    <div style={{background:C.green+"18",border:`1px solid ${C.green}44`,
+      borderRadius:12,padding:"12px 14px",marginBottom:12,
+      display:"flex",alignItems:"center",gap:10}}>
+      <span style={{fontSize:20}}>🏆</span>
+      <div>
+        <div style={{fontSize:13,fontWeight:800,color:C.green}}>Você está isento este mês!</div>
+        <div style={{fontSize:11,color:C.muted}}>Atingiu 15 check-ins — sem obrigação nos dias restantes.</div>
+      </div>
+    </div>
+  )}
+
+  {/* Próxima aula */}
+  {proxima ? (
+    <Card highlight={C.accent}>
+      <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.accent,
+        textTransform:"uppercase",marginBottom:10}}>✅ Sua próxima aula</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div>
+          <div style={{fontSize:26,fontWeight:900,color:C.accent}}>{proxima.hora}</div>
+          <div style={{fontSize:16,fontWeight:800}}>{proxima.nome}</div>
+          <div style={{fontSize:12,color:C.muted,marginTop:2}}>Coach {proxima.coach}</div>
+        </div>
+        <div style={{background:C.accent+"18",border:`1px solid ${C.accent}33`,
+          borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+          <div style={{fontSize:18}}>🔔</div>
+          <div style={{fontSize:9,fontWeight:700,color:C.accent,letterSpacing:.5,marginTop:2}}>LEMBRETE<br/>ATIVO</div>
+        </div>
+      </div>
+      <Divider/>
+      <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.muted,
+        textTransform:"uppercase",marginBottom:8}}>
+        Não esqueça do check-in no app:
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={()=>window.open("https://wellhub.com","_blank")} style={{
+          flex:1,background:"#1B4DCC",border:"none",borderRadius:10,
+          padding:"11px 8px",cursor:"pointer",fontFamily:"inherit",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          <span style={{fontSize:18}}>💪</span>
+          <span style={{fontSize:12,fontWeight:800,color:"#fff",letterSpacing:.5}}>Wellhub</span>
+        </button>
+        <button onClick={()=>window.open("https://totalpass.com","_blank")} style={{
+          flex:1,background:"#7C3AED",border:"none",borderRadius:10,
+          padding:"11px 8px",cursor:"pointer",fontFamily:"inherit",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          <span style={{fontSize:18}}>⚡</span>
+          <span style={{fontSize:12,fontWeight:800,color:"#fff",letterSpacing:.5}}>Totalpass</span>
+        </button>
+      </div>
+      <p style={{fontSize:10,color:C.muted,marginTop:8,textAlign:"center",fontWeight:600}}>
+        Abre o app direto — é só confirmar sua presença no box
+      </p>
+    </Card>
+  ) : (
+    <Card>
+      <div style={{textAlign:"center",padding:"6px 0"}}>
+        <div style={{fontSize:13,color:C.muted,fontWeight:700,marginBottom:10}}>
+          Nenhuma aula reservada para hoje
+        </div>
+        <Btn small onClick={()=>setTab("aulas")}>Ver horários →</Btn>
+      </div>
+    </Card>
+  )}
+
+  {/* Notif banner */}
+  {notifPerm!=="granted" && (
+    <div style={{background:C.subtle,border:`1px solid ${C.border}`,
+      borderRadius:12,padding:"12px 14px",marginBottom:12,
+      display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <Icon name="bell" size={18} color={C.accent}/>
+        <div>
+          <div style={{fontSize:13,fontWeight:800}}>Ativar lembretes</div>
+          <div style={{fontSize:11,color:C.muted}}>Aviso 10 min antes da aula</div>
+        </div>
+      </div>
+      <Btn small onClick={onAtivarNotif}>Ativar</Btn>
+    </div>
+  )}
+
+  {/* PRs */}
+  <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,
+    textTransform:"uppercase",marginBottom:8}}>Meus PRs</div>
+  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+    {prs.length===0
+      ? <div style={{gridColumn:"1/-1",background:C.card,border:`1px solid ${C.border}`,
+          borderRadius:12,padding:"12px",textAlign:"center",fontSize:12,color:C.muted}}>
+          Adicione PRs na aba Perfil
+        </div>
+      : prs.map(pr=>(
+        <div key={pr.id} style={{background:C.card,border:`1px solid ${C.border}`,
+          borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
+          <div style={{fontSize:18,fontWeight:900,color:C.accent}}>{pr.peso}</div>
+          <div style={{fontSize:9,fontWeight:700,color:C.muted,textTransform:"uppercase",
+            letterSpacing:1,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",
+            whiteSpace:"nowrap"}}>{pr.exercicio}</div>
+        </div>
+      ))
+    }
+  </div>
+
+  {/* Calendário */}
+  <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,
+    textTransform:"uppercase",marginBottom:8}}>Frequência — Abril</div>
+  <Card>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
+      {diasGrid.map(d=>(
+        <div key={d} style={{aspectRatio:"1",borderRadius:6,
+          background:presentes.includes(d)?C.accent:C.subtle,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          fontSize:10,fontWeight:700,
+          color:presentes.includes(d)?"#000":C.muted}}>{d}</div>
+      ))}
+    </div>
+  </Card>
+</div>
+```
+
+);
+}
+
+/* AULAS */
+function AulasScreen({ reservas, setReservas }) {
+const hoje = getDiaSemana();
+const diasDisponiveis = hoje ? DIAS.slice(DIAS.indexOf(hoje)) : DIAS;
+const [diaIdx, setDiaIdx] = useState(0);
+const diaSel = diasDisponiveis[diaIdx] || “Seg”;
+const horarios = getHorariosDia(diaSel);
+
+const aulasDia = horarios.map((h,i)=>({
+id: diaIdx*100+i, hora:h, dia:diaSel,
+nome: h<“10:00”?“WOD Matinal”:h===“12:00”?“WOD Almoço”:“WOD Principal”,
+coach:[“Rafael”,“Camila”,“Thiago”][i%3],
+vagas:15, ocupadas:[3,8,12,5,7,10,13,6,4][i]||5,
+}));
+
+return (
+<div>
+<h2 style={{fontSize:26,fontWeight:900,letterSpacing:1,marginBottom:4}}>AULAS</h2>
+<p style={{fontSize:13,color:C.muted,marginBottom:14}}>
+Seg–Qui: 9 horários · Sex: 8 horários · Sáb/Dom: treino especial
+</p>
+
+```
+  {/* Experimental */}
+  <div style={{background:`linear-gradient(120deg,${C.accentD},${C.accent})`,
+    borderRadius:14,padding:"16px 18px",marginBottom:14,
+    display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    <div>
+      <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:"rgba(0,0,0,0.5)",textTransform:"uppercase"}}>
+        Convide um amigo
+      </div>
+      <div style={{fontSize:18,fontWeight:900,color:"#000",marginTop:2}}>Aula Experimental</div>
+      <div style={{fontSize:12,color:"rgba(0,0,0,0.55)",marginTop:3}}>Grátis · Sem compromisso</div>
+    </div>
+    <Btn small onClick={()=>alert("Solicitação enviada! O coach vai confirmar em breve.")}>Agendar</Btn>
+  </div>
+
+  {/* Dias */}
+  <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:4}}>
+    {diasDisponiveis.map((d,i)=>(
+      <button key={d} onClick={()=>setDiaIdx(i)} style={{
+        background:i===diaIdx?C.accent:C.subtle,
+        color:i===diaIdx?"#000":C.muted,
+        border:"none",borderRadius:10,padding:"8px 18px",
+        fontWeight:800,fontSize:12,letterSpacing:1,
+        cursor:"pointer",fontFamily:"inherit",textTransform:"uppercase",
+        whiteSpace:"nowrap",flexShrink:0,
+      }}>{i===0?"Hoje":d}</button>
+    ))}
+  </div>
+
+  {aulasDia.map(a=>{
+    const cheia=a.ocupadas>=a.vagas;
+    const reservado=reservas.includes(a.id);
+    const pct=a.ocupadas/a.vagas;
+    const cor=pct>=1?C.red:pct>=.75?C.accent:C.green;
+    return (
+      <Card key={a.id} highlight={reservado?C.accent:null}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+          <div>
+            <div style={{fontSize:24,fontWeight:900,color:reservado?C.accent:C.text}}>{a.hora}</div>
+            <div style={{fontSize:15,fontWeight:800,marginTop:1}}>{a.nome}</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>Coach {a.coach}</div>
+          </div>
+          {reservado?<Tag color={C.accent}>✓ Reservado</Tag>
+            :cheia?<Tag color={C.red}>Lotado</Tag>
+            :<Tag color={C.green}>Disponível</Tag>}
+        </div>
+        <div style={{marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+            <span style={{fontSize:10,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>Vagas</span>
+            <span style={{fontSize:12,fontWeight:800,color:cor}}>{a.ocupadas}/{a.vagas}</span>
+          </div>
+          <Bar value={a.ocupadas} max={a.vagas} color={cor} thin/>
+        </div>
+        {reservado
+          ?<Btn full variant="ghost" onClick={()=>setReservas(reservas.filter(r=>r!==a.id))}>Cancelar reserva</Btn>
+          :<Btn full disabled={cheia}
+            onClick={()=>!cheia&&setReservas([...reservas,a.id])}>
+            {cheia?"Entrar na lista de espera":"Reservar vaga"}
+          </Btn>}
+      </Card>
+    );
+  })}
+</div>
+```
+
+);
+}
+
+/* PERFIL */
+function PerfilScreen({ prs, salvarPRs }) {
+const { nome, plano, vencimento, checkinsMes, meta, streak } = ALUNO;
+const atingiu = checkinsMes >= meta;
+
+const [showForm, setShowForm] = useState(false);
+const [novoEx, setNovoEx]     = useState(””);
+const [novoPeso, setNovoPeso] = useState(””);
+const [editId, setEditId]     = useState(null);
+
+const abrirNovo = () => {
+setEditId(null); setNovoEx(””); setNovoPeso(””); setShowForm(true);
+};
+
+const abrirEditar = (pr) => {
+setEditId(pr.id); setNovoEx(pr.exercicio); setNovoPeso(pr.peso); setShowForm(true);
+};
+
+const salvar = () => {
+if (!novoEx.trim() || !novoPeso.trim()) return;
+let lista;
+if (editId) {
+lista = prs.map(p => p.id===editId ? {…p, exercicio:novoEx.trim(), peso:novoPeso.trim()} : p);
+} else {
+lista = […prs, { id: Date.now(), exercicio:novoEx.trim(), peso:novoPeso.trim() }];
+}
+salvarPRs(lista);
+setShowForm(false); setNovoEx(””); setNovoPeso(””); setEditId(null);
+};
+
+const excluir = (id) => salvarPRs(prs.filter(p => p.id !== id));
+
+const hist = [
+{data:“07/04”,aula:“WOD Principal”,hora:“18:30”,coach:“Thiago”},
+{data:“05/04”,aula:“WOD Matinal”,hora:“05:30”,coach:“Rafael”},
+{data:“04/04”,aula:“WOD Almoço”,hora:“12:00”,coach:“Camila”},
+{data:“03/04”,aula:“WOD Principal”,hora:“17:30”,coach:“Thiago”},
+{data:“02/04”,aula:“WOD Matinal”,hora:“06:30”,coach:“Rafael”},
+];
+
+const inputStyle = {
+flex:1, background:C.subtle, border:`1px solid ${C.border}`,
+borderRadius:8, padding:“10px 12px”, color:C.text,
+fontSize:14, fontFamily:“inherit”, outline:“none”,
+};
+
+return (
+<div>
+{/* Avatar */}
+<div style={{textAlign:“center”,padding:“10px 0 22px”}}>
+<div style={{width:80,height:80,borderRadius:“50%”,
+background:`linear-gradient(135deg,${C.accentD},${C.accent})`,
+margin:“0 auto 12px”,display:“flex”,alignItems:“center”,
+justifyContent:“center”,fontSize:30,fontWeight:900,color:”#000”}}>
+{nome[0]}
+</div>
+<div style={{fontSize:22,fontWeight:900}}>{nome}</div>
+<div style={{fontSize:13,color:C.muted,marginTop:3}}>{plano} · Vence {vencimento}</div>
+<div style={{display:“flex”,gap:8,justifyContent:“center”,marginTop:10,flexWrap:“wrap”}}>
+<Tag color={C.green}>Ativo</Tag>
+<Tag color={C.accent}>🔥 {streak} dias seguidos</Tag>
+{atingiu && <Tag color={C.yellow}>🏆 Isento este mês</Tag>}
+</div>
+</div>
+
+```
+  {/* Meta check-ins */}
+  <Card highlight={atingiu?C.green:null}>
+    <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+      <div>
+        <div style={{fontSize:14,fontWeight:800}}>Meta de Check-ins</div>
+        <div style={{fontSize:11,color:C.muted,marginTop:2}}>
+          {atingiu?"🏆 Meta atingida! Isento pelo resto do mês."
+            :`Faltam ${meta-checkinsMes} para ficar isento`}
+        </div>
+      </div>
+      <div style={{fontSize:26,fontWeight:900,color:atingiu?C.green:C.accent}}>
+        {checkinsMes}<span style={{fontSize:14,color:C.muted}}>/{meta}</span>
+      </div>
+    </div>
+    <Bar value={checkinsMes} max={meta} color={atingiu?C.green:C.accent}/>
+    {!atingiu && (
+      <div style={{marginTop:10,background:C.subtle,borderRadius:8,padding:"8px 12px"}}>
+        <div style={{fontSize:11,fontWeight:700,color:C.muted,lineHeight:1.5}}>
+          💡 Faça 15 check-ins no mês e fique isento de registrar presença nos dias restantes.
+        </div>
+      </div>
+    )}
+  </Card>
+
+  {/* Stats */}
+  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+    <Card style={{margin:0,textAlign:"center"}}>
+      <div style={{fontSize:28,fontWeight:900,color:C.accent}}>{checkinsMes}</div>
+      <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1}}>Check-ins Abril</div>
+    </Card>
+    <Card style={{margin:0,textAlign:"center"}}>
+      <div style={{fontSize:28,fontWeight:900,color:C.green}}>{streak}</div>
+      <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1}}>Dias Seguidos</div>
+    </Card>
+  </div>
+
+  {/* PRs editáveis */}
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+    <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase"}}>
+      Recordes Pessoais
+    </div>
+    <Btn small onClick={abrirNovo}>+ Novo PR</Btn>
+  </div>
+
+  {/* Formulário novo/editar PR */}
+  {showForm && (
+    <Card highlight={C.accent} style={{marginBottom:12}}>
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.accent,
+        textTransform:"uppercase",marginBottom:12}}>
+        {editId ? "Editar PR" : "Novo PR"}
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+        <input
+          value={novoEx} onChange={e=>setNovoEx(e.target.value)}
+          placeholder="Exercício (ex: Snatch, Deadlift...)"
+          style={{...inputStyle,width:"100%",boxSizing:"border-box"}}
+        />
+        <input
+          value={novoPeso} onChange={e=>setNovoPeso(e.target.value)}
+          placeholder="Peso (ex: 95kg, 1:45 min...)"
+          style={{...inputStyle,width:"100%",boxSizing:"border-box"}}
+        />
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <Btn full onClick={salvar}>Salvar</Btn>
+        <Btn full variant="ghost" onClick={()=>setShowForm(false)}>Cancelar</Btn>
+      </div>
+    </Card>
+  )}
+
+  {prs.length === 0 ? (
+    <Card>
+      <div style={{textAlign:"center",padding:"12px 0"}}>
+        <div style={{fontSize:24,marginBottom:8}}>🏋️</div>
+        <div style={{fontSize:13,color:C.muted,fontWeight:700}}>Nenhum PR registrado ainda</div>
+        <div style={{fontSize:11,color:C.muted,marginTop:4}}>Toque em "+ Novo PR" para começar</div>
+      </div>
+    </Card>
+  ) : (
+    <Card>
+      {prs.map((pr,i)=>(
+        <div key={pr.id}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
+            <div>
+              <div style={{fontSize:14,fontWeight:800}}>{pr.exercicio}</div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:20,fontWeight:900,color:C.accent}}>{pr.peso}</span>
+              <button onClick={()=>abrirEditar(pr)} style={{
+                background:"none",border:`1px solid ${C.border}`,
+                borderRadius:6,padding:"4px 8px",cursor:"pointer",
+                fontSize:10,fontWeight:700,color:C.muted,fontFamily:"inherit",letterSpacing:.5,
+              }}>Editar</button>
+              <button onClick={()=>excluir(pr.id)} style={{
+                background:"none",border:"none",cursor:"pointer",padding:4,
+              }}>
+                <Icon name="x" size={14} color={C.red}/>
+              </button>
+            </div>
+          </div>
+          {i<prs.length-1&&<Divider/>}
+        </div>
+      ))}
+    </Card>
+  )}
+
+  {/* Histórico */}
+  <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,
+    textTransform:"uppercase",marginBottom:8,marginTop:4}}>Histórico Recente</div>
+  {hist.map((h,i)=>(
+    <div key={i} style={{background:C.card,border:`1px solid ${C.border}`,
+      borderRadius:12,padding:"12px 14px",marginBottom:8,
+      display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <div style={{width:36,height:36,borderRadius:10,background:C.accent+"22",
+          display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <Icon name="check" size={18} color={C.accent}/>
+        </div>
+        <div>
+          <div style={{fontSize:14,fontWeight:800}}>{h.hora} · {h.aula}</div>
+          <div style={{fontSize:11,color:C.muted,marginTop:1}}>Coach {h.coach}</div>
+        </div>
+      </div>
+      <span style={{fontSize:11,fontWeight:700,color:C.muted}}>{h.data}</span>
+    </div>
+  ))}
+</div>
+```
+
+);
+}
+
+/* ══════════════════════════════════════════════════════════════
+ÁREA ADMIN — TELA CHEIA
+══════════════════════════════════════════════════════════════ */
+
+function AdminLogin({ onLogin }) {
+const [senha, setSenha] = useState(””);
+const [erro, setErro]   = useState(false);
+const tentar = () => senha===“admin123” ? onLogin() : (setErro(true),setSenha(””));
+
+return (
+<div style={{minHeight:“100vh”,background:C.bg,display:“flex”,
+flexDirection:“column”,alignItems:“center”,justifyContent:“center”,padding:24}}>
+<div style={{width:64,height:64,borderRadius:16,
+background:`linear-gradient(135deg,${C.accentD},${C.accent})`,
+display:“flex”,alignItems:“center”,justifyContent:“center”,marginBottom:20}}>
+<Icon name="lock" size={30} color="#000"/>
+</div>
+<div style={{fontSize:24,fontWeight:900,letterSpacing:1,marginBottom:4}}>ÁREA ADMIN</div>
+<div style={{fontSize:13,color:C.muted,marginBottom:30,textAlign:“center”}}>
+CrossFit Amazonas · Acesso restrito
+</div>
+<div style={{width:“100%”,maxWidth:320}}>
+<input type=“password” value={senha}
+onChange={e=>{setSenha(e.target.value);setErro(false);}}
+onKeyDown={e=>e.key===“Enter”&&tentar()}
+placeholder=“Senha de acesso…”
+style={{width:“100%”,background:C.card,
+border:`2px solid ${erro?C.red:C.border}`,
+borderRadius:12,padding:“14px 16px”,color:C.text,
+fontSize:16,fontFamily:“inherit”,outline:“none”,
+boxSizing:“border-box”,marginBottom:8,
+textAlign:“center”,letterSpacing:6}}
+/>
+{erro&&<p style={{fontSize:12,color:C.red,fontWeight:700,textAlign:“center”,marginBottom:8}}>Senha incorreta</p>}
+<Btn full onClick={tentar}>Entrar</Btn>
+<p style={{fontSize:10,color:C.muted,textAlign:“center”,marginTop:10}}>Demo: admin123</p>
+</div>
+</div>
+);
+}
+
+function AdminPanel({ onSair }) {
+const [aba, setAba]         = useState(“dashboard”);
+const [pedidos, setPedidos] = useState(ESPERA_INIT);
+
+const pendentes = pedidos.filter(p=>p.status===“pendente”).length;
+const isentos   = ADMIN_ALUNOS.filter(a=>a.checkins>=15);
+const vencidos  = ADMIN_ALUNOS.filter(a=>a.status===“vencido”);
+
+const responder = (id, resp) => setPedidos(pedidos.map(p=>p.id===id?{…p,status:resp}:p));
+
+const abas = [
+{id:“dashboard”, label:“Dashboard”, icon:“home”},
+{id:“pedidos”,   label:“Pedidos”,   icon:“bell”,  badge:pendentes},
+{id:“alunos”,    label:“Alunos”,    icon:“users”},
+];
+
+return (
+<div style={{minHeight:“100vh”,background:C.bg,maxWidth:430,margin:“0 auto”}}>
+{/* Admin header */}
+<div style={{background:”#0D0D0D”,borderBottom:`1px solid ${C.border}`,
+padding:“14px 16px”,display:“flex”,alignItems:“center”,justifyContent:“space-between”,
+position:“sticky”,top:0,zIndex:100}}>
+<div style={{display:“flex”,alignItems:“center”,gap:10}}>
+<div style={{width:30,height:30,borderRadius:8,
+background:`linear-gradient(135deg,${C.accentD},${C.accent})`,
+display:“flex”,alignItems:“center”,justifyContent:“center”}}>
+<Icon name="fire" size={16} color="#000"/>
+</div>
+<div>
+<div style={{fontSize:13,fontWeight:900,color:C.accent,letterSpacing:1,lineHeight:1}}>ADMIN</div>
+<div style={{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:2,lineHeight:1}}>CROSSFIT AMAZONAS</div>
+</div>
+</div>
+<button onClick={onSair} style={{background:C.subtle,border:`1px solid ${C.border}`,
+borderRadius:8,padding:“6px 12px”,cursor:“pointer”,display:“flex”,
+alignItems:“center”,gap:6}}>
+<Icon name="arrow" size={14} color={C.muted}/>
+<span style={{fontSize:11,fontWeight:700,color:C.muted,fontFamily:“inherit”,letterSpacing:1}}>SAIR</span>
+</button>
+</div>
+
+```
+  {/* Conteúdo */}
+  <div style={{padding:"16px 16px 90px"}}>
+
+    {/* DASHBOARD */}
+    {aba==="dashboard" && (
+      <div>
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:C.muted,
+          textTransform:"uppercase",marginBottom:12}}>Visão Geral — Hoje</div>
+
+        {/* Cards clicáveis */}
+        {(()=>{
+          const [expandido, setExpandido] = useState(null);
+          const ativos  = ADMIN_ALUNOS.filter(a=>a.status==="ativo");
+          const isentos2 = ADMIN_ALUNOS.filter(a=>a.checkins>=15);
+          const cards = [
+            {id:"ativos",   label:"Alunos Ativos", val:ativos.length,          color:C.accent, icon:"users",    lista:ativos},
+            {id:"isentos",  label:"Isentos Mês",   val:isentos2.length,         color:C.green,  icon:"star",     lista:isentos2},
+            {id:"pendentes",label:"Pendentes",      val:pendentes,               color:C.yellow, icon:"bell",     lista:[]},
+            {id:"total",    label:"Total Alunos",   val:ADMIN_ALUNOS.length,     color:C.blue,   icon:"users",    lista:ADMIN_ALUNOS},
+          ];
+          return (
+            <>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                {cards.map(s=>(
+                  <div key={s.id}
+                    onClick={()=>s.lista.length>0&&setExpandido(expandido===s.id?null:s.id)}
+                    style={{background:C.card,border:`1px solid ${expandido===s.id?s.color:s.color+"33"}`,
+                      borderRadius:14,padding:"16px 14px",
+                      cursor:s.lista.length>0?"pointer":"default",
+                      transition:"border-color .2s"}}>
+                    <Icon name={s.icon} size={18} color={s.color}/>
+                    <div style={{fontSize:28,fontWeight:900,color:s.color,marginTop:8,lineHeight:1}}>{s.val}</div>
+                    <div style={{fontSize:10,fontWeight:700,color:C.muted,
+                      textTransform:"uppercase",letterSpacing:1,marginTop:4}}>{s.label}</div>
+                    {s.lista.length>0&&(
+                      <div style={{fontSize:9,color:s.color,fontWeight:700,marginTop:4,letterSpacing:1}}>
+                        {expandido===s.id?"▲ fechar":"▼ ver lista"}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Lista expandida */}
+              {expandido && cards.find(c=>c.id===expandido)?.lista.length>0 && (
+                <div style={{marginBottom:14}}>
+                  {cards.find(c=>c.id===expandido).lista.map(a=>{
+                    const cor = cards.find(c=>c.id===expandido).color;
+                    return (
+                      <div key={a.id} style={{background:C.card,border:`1px solid ${cor}33`,
+                        borderRadius:12,padding:"11px 14px",marginBottom:6,
+                        display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <Avatar nome={a.nome} color={cor} size={32}/>
+                          <div>
+                            <div style={{fontWeight:800,fontSize:13}}>{a.nome}</div>
+                            <div style={{fontSize:10,color:C.muted}}>{a.plano} · Vence {a.venc}</div>
+                          </div>
+                        </div>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:15,fontWeight:900,color:cor}}>{a.checkins}</div>
+                          <div style={{fontSize:9,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>check-ins</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          );
+        })()}
+
+        {/* Isentos destaque */}
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,
+          textTransform:"uppercase",marginBottom:8}}>🏆 Isentos este mês</div>
+        {isentos.length===0
+          ? <Card><div style={{fontSize:13,color:C.muted,textAlign:"center",padding:"8px 0"}}>Nenhum aluno atingiu 15 check-ins ainda</div></Card>
+          : isentos.map(a=>(
+            <div key={a.id} style={{background:C.green+"0F",border:`1px solid ${C.green}33`,
+              borderRadius:12,padding:"12px 14px",marginBottom:8,
+              display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <Avatar nome={a.nome} color={C.green}/>
+                <div>
+                  <div style={{fontWeight:800,fontSize:14}}>{a.nome}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{a.plano} · Vence {a.venc}</div>
+                </div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:20,fontWeight:900,color:C.green}}>{a.checkins}</div>
+                <div style={{fontSize:9,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>check-ins</div>
+              </div>
+            </div>
+          ))}
+      </div>
+    )}
+
+    {/* PEDIDOS */}
+    {aba==="pedidos" && (
+      <div>
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:C.muted,
+          textTransform:"uppercase",marginBottom:4}}>Solicitações</div>
+        <p style={{fontSize:13,color:C.muted,marginBottom:14}}>
+          Lista de espera e aulas experimentais aguardando resposta
+        </p>
+        {pedidos.map(p=>{
+          const cor = p.tipo==="experimental"?C.blue:C.yellow;
+          return (
+            <Card key={p.id} highlight={p.status==="pendente"?cor:p.status==="aceito"?C.green:C.red}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <Avatar nome={p.nome} color={cor}/>
+                  <div>
+                    <div style={{fontWeight:800,fontSize:14}}>{p.nome}</div>
+                    <div style={{fontSize:11,color:C.muted,marginTop:2}}>{p.aula}</div>
+                    <div style={{fontSize:10,color:C.muted,marginTop:1}}>Solicitado às {p.hora}</div>
+                  </div>
+                </div>
+                <Tag color={p.tipo==="experimental"?C.blue:C.yellow}>
+                  {p.tipo==="experimental"?"Experimental":"Lista Espera"}
+                </Tag>
+              </div>
+              {p.status==="pendente" ? (
+                <div style={{display:"flex",gap:8}}>
+                  <Btn full variant="green" small onClick={()=>responder(p.id,"aceito")}>✓ Aceitar</Btn>
+                  <Btn full variant="danger" small onClick={()=>responder(p.id,"recusado")}>✗ Recusar</Btn>
+                </div>
+              ) : (
+                <div style={{textAlign:"center"}}>
+                  <Tag color={p.status==="aceito"?C.green:C.red}>
+                    {p.status==="aceito"?"✓ Aceito":"✗ Recusado"}
+                  </Tag>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+    )}
+
+    {/* ALUNOS */}
+    {aba==="alunos" && (
+      <div>
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:C.muted,
+          textTransform:"uppercase",marginBottom:14}}>Alunos — Check-ins do mês</div>
+        {ADMIN_ALUNOS.sort((a,b)=>b.checkins-a.checkins).map(a=>{
+          const atingiu = a.checkins>=15;
+          const cor = a.status==="vencido"?C.red:atingiu?C.green:C.accent;
+          return (
+            <Card key={a.id} highlight={atingiu?C.green:a.status==="vencido"?C.red:null}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <Avatar nome={a.nome} color={cor}/>
+                  <div>
+                    <div style={{fontWeight:800,fontSize:15}}>{a.nome}</div>
+                    <div style={{fontSize:11,color:C.muted,marginTop:2}}>{a.plano} · Vence {a.venc}</div>
+                  </div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                  <Tag color={a.status==="ativo"?C.green:C.red}>{a.status}</Tag>
+                  {atingiu&&<Tag color={C.green}>🏆 Isento</Tag>}
+                </div>
+              </div>
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                  <span style={{fontSize:10,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
+                    Check-ins
+                  </span>
+                  <span style={{fontSize:13,fontWeight:900,color:cor}}>
+                    {a.checkins}/15 {atingiu?"✅":""}
+                  </span>
+                </div>
+                <Bar value={a.checkins} max={15} color={cor} thin/>
+                {atingiu&&(
+                  <div style={{marginTop:8,background:C.green+"18",border:`1px solid ${C.green}33`,
+                    borderRadius:8,padding:"6px 10px"}}>
+                    <span style={{fontSize:11,color:C.green,fontWeight:700}}>
+                      Isento — não precisa fazer check-in pelo resto do mês
+                    </span>
+                  </div>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    )}
+
+  </div>
+
+  {/* Admin bottom nav */}
+  <div style={{display:"flex",background:"#0D0D0D",borderTop:`1px solid ${C.border}`,
+    position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
+    width:"100%",maxWidth:430,zIndex:100}}>
+    {abas.map(t=>{
+      const active=aba===t.id;
+      return (
+        <button key={t.id} onClick={()=>setAba(t.id)} style={{
+          flex:1,display:"flex",flexDirection:"column",alignItems:"center",
+          padding:"10px 0 14px",background:"none",border:"none",
+          borderTop:active?`2px solid ${C.accent}`:"2px solid transparent",
+          cursor:"pointer",position:"relative"}}>
+          <Icon name={t.icon} size={20} color={active?C.accent:C.muted}/>
+          {t.badge>0&&(
+            <div style={{position:"absolute",top:6,right:"50%",marginRight:-18,
+              width:16,height:16,borderRadius:"50%",background:C.red,
+              fontSize:9,fontWeight:900,color:"#fff",
+              display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {t.badge}
+            </div>
+          )}
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1,marginTop:4,
+            color:active?C.accent:C.muted,textTransform:"uppercase",
+            fontFamily:"'Barlow Condensed',sans-serif"}}>{t.label}</span>
+        </button>
+      );
+    })}
+  </div>
+</div>
+```
+
+);
+}
+
+/* ══════════════════════════════════════════════════════════════
+APP ROOT
+══════════════════════════════════════════════════════════════ */
+export default function App() {
+const [tab,setTab]             = useState(“home”);
+const [reservas,setReservas]   = useState([]);
+const [adminMode,setAdminMode] = useState(false);
+const [adminAuth,setAdminAuth] = useState(false);
+const [showInstall,setShowInstall] = useState(false); // começa false, só abre após checar storage
+const [notifPerm,setNotifPerm] = useState(“default”);
+const [banner,setBanner]       = useState(null);
+const [prs, setPrs]            = useState(PR_DEFAULT);
+const timerRef                 = useRef(null);
+
+// Carregar PRs e preferência do popup do storage na inicialização
+useEffect(()=>{
+(async()=>{
+try {
+const resPR = await window.storage.get(“prs”);
+if(resPR) setPrs(JSON.parse(resPR.value));
+} catch(*){}
+try {
+const resPopup = await window.storage.get(“install-never-show”);
+if(!resPopup) setShowInstall(true); // nunca clicou “não mostrar” → mostra
+} catch(*){
+setShowInstall(true); // chave não existe → mostra
+}
+})();
+},[]);
+
+const fecharInstall = () => setShowInstall(false);
+const nuncaMostrar  = async () => {
+setShowInstall(false);
+try { await window.storage.set(“install-never-show”,“1”); } catch(_){}
+};
+
+const salvarPRs = async(lista)=>{
+setPrs(lista);
+try { await window.storage.set(“prs”, JSON.stringify(lista)); } catch(_){}
+};
+
+useEffect(()=>{
+const res = AULAS.find(a=>reservas.includes(a.id));
+if(!res){setBanner(null);return;}
+if(timerRef.current) clearTimeout(timerRef.current);
+timerRef.current = setTimeout(()=>setBanner(res),4000);
+return ()=>clearTimeout(timerRef.current);
+},[reservas]);
+
+const ativarNotif = async()=>{
+if(!(“Notification” in window)){alert(“Adicione o app à tela inicial para ativar notificações.”);return;}
+const p = await Notification.requestPermission();
+setNotifPerm(p);
+if(p===“granted”) new Notification(“CrossFit Amazonas 🔥”,{body:“Notificações ativadas!”});
+};
+
+// ADMIN MODE
+if(adminMode){
+if(!adminAuth) return <AdminLogin onLogin={()=>setAdminAuth(true)}/>;
+return <AdminPanel onSair={()=>{setAdminMode(false);setAdminAuth(false);}}/>;
+}
+
+const screens = {
+home:   <HomeScreen reservas={reservas} setReservas={setReservas} setTab={setTab} notifPerm={notifPerm} onAtivarNotif={ativarNotif} prs={prs}/>,
+aulas:  <AulasScreen reservas={reservas} setReservas={setReservas}/>,
+perfil: <PerfilScreen prs={prs} salvarPRs={salvarPRs}/>,
+};
+const navTabs = [
+{id:“home”,  label:“Início”, icon:“home”},
+{id:“aulas”, label:“Aulas”,  icon:“calendar”},
+{id:“perfil”,label:“Perfil”, icon:“person”},
+];
+
+return (
+<>
+<style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&display=swap'); *{margin:0;padding:0;box-sizing:border-box;} body{background:#040404;} ::-webkit-scrollbar{width:3px;} ::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:4px;} input::placeholder{color:#333;}`}</style>
+
+```
+  <div style={{fontFamily:"'Barlow Condensed',Impact,sans-serif",
+    background:C.bg,color:C.text,minHeight:"100vh",maxWidth:430,margin:"0 auto",position:"relative"}}>
+
+    {banner&&<NotifBanner aula={banner} onDismiss={()=>setBanner(null)}/>}
+
+    {/* Header */}
+    <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,
+      padding:"13px 16px",display:"flex",alignItems:"center",
+      justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:32,height:32,borderRadius:8,
+          background:`linear-gradient(135deg,${C.accentD},${C.accent})`,
+          display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <Icon name="fire" size={18} color="#000"/>
+        </div>
+        <div>
+          <div style={{fontSize:15,fontWeight:900,color:C.accent,letterSpacing:2,lineHeight:1}}>CROSSFIT</div>
+          <div style={{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:3,lineHeight:1}}>AMAZONAS</div>
+        </div>
+      </div>
+      <button onClick={()=>setAdminMode(true)} style={{background:"none",
+        border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",
+        display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}>
+        <Icon name="lock" size={12} color={C.muted}/>
+        <span style={{fontSize:9,fontWeight:700,color:C.muted,fontFamily:"inherit",letterSpacing:1}}>ADMIN</span>
+      </button>
+    </div>
+
+    <div style={{padding:"16px 16px 90px"}}>{screens[tab]}</div>
+
+    {/* Nav */}
+    <div style={{display:"flex",background:C.surface,borderTop:`1px solid ${C.border}`,
+      position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
+      width:"100%",maxWidth:430,zIndex:100}}>
+      {navTabs.map(t=>{
+        const active=tab===t.id;
+        return(
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{
+            flex:1,display:"flex",flexDirection:"column",alignItems:"center",
+            padding:"10px 0 14px",background:"none",border:"none",
+            borderTop:active?`2px solid ${C.accent}`:"2px solid transparent",cursor:"pointer"}}>
+            <Icon name={t.icon} size={20} color={active?C.accent:C.muted}/>
+            <span style={{fontSize:9,fontWeight:700,letterSpacing:1,marginTop:4,
+              color:active?C.accent:C.muted,textTransform:"uppercase",
+              fontFamily:"'Barlow Condensed',sans-serif"}}>{t.label}</span>
+          </button>
+        );
+      })}
+    </div>
+
+    {showInstall&&(
+      <InstallPopup onClose={fecharInstall} onNever={nuncaMostrar}/>
+    )}
+  </div>
+</>
+```
+
+);
+}
