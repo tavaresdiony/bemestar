@@ -66,7 +66,14 @@ const { useState, useEffect, useRef } = React;
 ════════════════════════════════════════════════════ */
 const SUPABASE_URL  = "https://rdyxsxrqaragffgdcqkg.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkeXhzeHJxYXJhZ2ZmZ2RjcWtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzNDA0NzYsImV4cCI6MjA5MDkxNjQ3Nn0.9IF5IN1ym_03USDjeuV4uQRL1oVCRyoHX_L6iySq1l0";
-const sb = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const SUPABASE_OK = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON.length > 20;
+let sb;
+try {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+} catch(e) {
+  console.error("Supabase init error:", e);
+}
 
 /* ── storage helper ──────────────────────────────── */
 const LS = {
@@ -127,6 +134,7 @@ function LoginScreen({onLogin}){
 
   const handleLogin=async()=>{
     if(!email||!senha){setErro("Preencha e-mail e senha.");return;}
+    if(!sb){setErro("Supabase não configurado. Contate o administrador.");return;}
     setLoading(true);limpar();
     const{error,data}=await sb.auth.signInWithPassword({email,password:senha});
     setLoading(false);
@@ -136,6 +144,7 @@ function LoginScreen({onLogin}){
   const handleCadastro=async()=>{
     if(!email||!senha){setErro("Preencha e-mail e senha.");return;}
     if(senha.length<6){setErro("Senha precisa ter ao menos 6 caracteres.");return;}
+    if(!sb){setErro("Supabase não configurado. Contate o administrador.");return;}
     setLoading(true);limpar();
     const{error}=await sb.auth.signUp({email,password:senha});
     setLoading(false);
@@ -144,6 +153,7 @@ function LoginScreen({onLogin}){
   };
   const handleRecuperar=async()=>{
     if(!email){setErro("Digite seu e-mail.");return;}
+    if(!sb){setErro("Supabase não configurado.");return;}
     setLoading(true);limpar();
     const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});
     setLoading(false);
@@ -318,7 +328,7 @@ function PerfilScreen({user,prs,salvarPRs,onLogout}){
   const abrirEditar=pr=>{setEditId(pr.id);setNovoEx(pr.exercicio);setNovoPeso(pr.peso);setShowForm(true);};
   const salvar=()=>{if(!novoEx.trim()||!novoPeso.trim())return;const lista=editId?prs.map(p=>p.id===editId?{...p,exercicio:novoEx.trim(),peso:novoPeso.trim()}:p):[...prs,{id:Date.now(),exercicio:novoEx.trim(),peso:novoPeso.trim()}];salvarPRs(lista);setShowForm(false);setNovoEx("");setNovoPeso("");setEditId(null);};
   const excluir=id=>salvarPRs(prs.filter(p=>p.id!==id));
-  const handleLogout=async()=>{setLogoutLoading(true);await sb.auth.signOut();onLogout();};
+  const handleLogout=async()=>{setLogoutLoading(true);if(sb)await sb.auth.signOut();onLogout();};
   const inp={flex:1,background:C.subtle,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px 12px",color:C.text,fontSize:14,fontFamily:"inherit"};
   const hist=[{data:"07/04",aula:"WOD Principal",hora:"18:30",coach:"Thiago"},{data:"05/04",aula:"WOD Matinal",hora:"05:30",coach:"Rafael"},{data:"04/04",aula:"WOD Almoço",hora:"12:00",coach:"Camila"},{data:"03/04",aula:"WOD Principal",hora:"17:30",coach:"Thiago"},{data:"02/04",aula:"WOD Matinal",hora:"06:30",coach:"Rafael"}];
   return(
@@ -422,6 +432,11 @@ function App(){
   const timerRef=useRef(null);
 
   useEffect(()=>{
+    if(!SUPABASE_OK || !sb){
+      console.warn("Supabase não configurado. Cole URL e ANON key no arquivo.");
+      setAuthLoading(false);
+      return;
+    }
     sb.auth.getSession().then(({data:{session}})=>{ setUser(session?.user||null); setAuthLoading(false); });
     const{data:{subscription}}=sb.auth.onAuthStateChange((_,session)=>setUser(session?.user||null));
     window.addEventListener("beforeinstallprompt",e=>e.preventDefault());
