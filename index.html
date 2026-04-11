@@ -15,36 +15,86 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
-    html,body{height:100%;background:#000000;}
+    html,body{height:100%;background:#000;}
     body{font-family:'Barlow Condensed',Impact,sans-serif;color:#F0F0F0;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
-    #root{max-width:430px;margin:0 auto;min-height:100vh;position:relative;}
+    #root{max-width:430px;margin:0 auto;min-height:100vh;position:relative;background:#000;}
     ::-webkit-scrollbar{width:3px;}
-    ::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:4px;}
+    ::-webkit-scrollbar-thumb{background:#222;border-radius:4px;}
     input::placeholder{color:#444;}
     input,button,textarea{font-family:'Barlow Condensed',Impact,sans-serif;}
     button{-webkit-tap-highlight-color:transparent;outline:none;}
     input{outline:none;}
 
-    /* ── SPLASH ─────────────────────────────────────── */
-    @keyframes logoIn   {0%{transform:scale(.5) rotate(-10deg);opacity:0}65%{transform:scale(1.08) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(0);opacity:1}}
-    @keyframes barFill  {0%{width:0}100%{width:100%}}
-    @keyframes textIn   {from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes fadeOut  {to{opacity:0;pointer-events:none}}
-    @keyframes fadeIn   {from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes slideUp  {from{transform:translateY(100%)}to{transform:translateY(0)}}
-    @keyframes spin     {to{transform:rotate(360deg)}}
+    /* ══════════════════════════════════════════
+       SPLASH — logo com efeito shimmer/luz
+    ══════════════════════════════════════════ */
+    @keyframes logoReveal {
+      0%   { opacity:0; transform:scale(.85); filter:brightness(.3) contrast(1.2); }
+      40%  { opacity:1; transform:scale(1.02); filter:brightness(.7) contrast(1.1); }
+      100% { opacity:1; transform:scale(1);   filter:brightness(1) contrast(1); }
+    }
+    @keyframes shimmer {
+      0%   { left:-100%; }
+      100% { left:200%; }
+    }
+    @keyframes barFill {
+      0%   { width:0%; opacity:0; }
+      10%  { opacity:1; }
+      100% { width:100%; opacity:1; }
+    }
+    @keyframes splashOut {
+      0%   { opacity:1; }
+      100% { opacity:0; pointer-events:none; }
+    }
+    @keyframes fadeIn  { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+    @keyframes spin    { to{transform:rotate(360deg)} }
 
-    #splash{position:fixed;inset:0;z-index:9999;background:#0000008;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-    #splash.hide{animation:fadeOut .5s ease forwards;}
-    #s-logo{width:160px;height:160px;object-fit:contain;margin-bottom:40px;animation:logoIn .8s cubic-bezier(.34,1.56,.64,1) both;}
-    #s-track{width:130px;height:3px;background:#1a1a1a;border-radius:3px;overflow:hidden;animation:textIn .3s ease .6s both;}
-    #s-bar{height:100%;background:linear-gradient(90deg,#CC5200,#FF6A00);border-radius:3px;animation:barFill 1.4s ease .7s both;}
+    #splash {
+      position:fixed;inset:0;z-index:9999;background:#000;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+    }
+    #splash.hide { animation:splashOut .6s ease .2s forwards; }
+
+    #s-wrap {
+      position:relative;overflow:hidden;
+      width:180px;height:180px;margin-bottom:44px;
+    }
+    #s-logo {
+      width:180px;height:180px;object-fit:contain;display:block;
+      animation:logoReveal 1s ease .1s both;
+    }
+    /* faixa de luz percorrendo a logo */
+    #s-shine {
+      position:absolute;top:0;left:-100%;width:60%;height:100%;
+      background:linear-gradient(105deg,
+        transparent 20%,
+        rgba(255,106,0,.55) 45%,
+        rgba(255,180,80,.7) 50%,
+        rgba(255,106,0,.55) 55%,
+        transparent 80%);
+      animation:shimmer 1.4s ease .9s both;
+      pointer-events:none;
+    }
+    #s-track {
+      width:130px;height:2px;background:#111;border-radius:2px;overflow:hidden;
+    }
+    #s-bar {
+      height:100%;
+      background:linear-gradient(90deg,#CC5200,#FF6A00,#FF9500);
+      border-radius:2px;
+      animation:barFill 1.6s ease .5s both;
+    }
   </style>
 </head>
 <body>
 
+<!-- SPLASH -->
 <div id="splash">
-  <img id="s-logo" src="/logoamazonas.png" alt="Amazonas"/>
+  <div id="s-wrap">
+    <img id="s-logo" src="/logoamazonas.png" alt="Amazonas"/>
+    <div id="s-shine"></div>
+  </div>
   <div id="s-track"><div id="s-bar"></div></div>
 </div>
 
@@ -56,182 +106,315 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-  setTimeout(function(){
-    var s=document.getElementById('splash');
-    if(s){s.classList.add('hide');setTimeout(function(){if(s.parentNode)s.parentNode.removeChild(s);},550);}
-  },2300);
+  // Splash some depois que React carregou — evita sobreposição
+  var splashDone = false;
+  function hideSplash() {
+    if(splashDone) return;
+    splashDone = true;
+    var s = document.getElementById('splash');
+    if(s){ s.classList.add('hide'); setTimeout(function(){ if(s.parentNode) s.parentNode.removeChild(s); }, 800); }
+  }
+  // Mínimo de 2.4s para a animação terminar bonito
+  setTimeout(hideSplash, 2400);
 </script>
 
 <script type="text/babel">
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef } = React;
 
 /* ════════════════════════════════════════════
-   ⚙️  SUPABASE — substitua pelos seus valores
-   Painel → Settings → API
+   ⚙️  SUPABASE
 ════════════════════════════════════════════ */
 const SUPABASE_URL  = "https://rdyxsxrqaragffgdcqkg.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkeXhzeHJxYXJhZ2ZmZ2RjcWtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzNDA0NzYsImV4cCI6MjA5MDkxNjQ3Nn0.9IF5IN1ym_03USDjeuV4uQRL1oVCRyoHX_L6iySq1l0";
-
 const SUPABASE_OK = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON.length > 20;
 let sb;
 try { sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch(e) { console.error(e); }
 
-/* ── Fake domain para username-only auth ──── */
 const FAKE_DOMAIN = "@amazonas.app";
-const toEmail = (u) => u.trim().toLowerCase().replace(/\s+/g, "_") + FAKE_DOMAIN;
+const toEmail = (u) => u.trim().toLowerCase().replace(/\s+/g,"_") + FAKE_DOMAIN;
 
-/* ── localStorage helper ─────────────────── */
 const LS = {
   get:(k)=>{ try{const v=localStorage.getItem(k);return v?{value:v}:null;}catch(e){return null;} },
   set:(k,v)=>{ try{localStorage.setItem(k,v);}catch(e){} },
 };
 
-/* ── Admin credentials (case-insensitive) ── */
 const ADMIN_USER = "adminamazonas";
 const ADMIN_PASS = "amazonasbox2026";
 
-/* ── Design tokens ───────────────────────── */
-const C={bg:"#080808",surface:"#111",card:"#161616",border:"#202020",accent:"#FF6A00",accentD:"#CC5200",green:"#22C55E",red:"#EF4444",blue:"#3B82F6",yellow:"#F59E0B",text:"#F0F0F0",muted:"#555",subtle:"#1A1A1A"};
+/* ════════════════════════════════════════════
+   DESIGN TOKENS — fundo #000 puro
+════════════════════════════════════════════ */
+const C = {
+  bg:      "#000000",
+  surface: "#0A0A0A",
+  card:    "#111111",
+  border:  "#1E1E1E",
+  accent:  "#FF6A00",
+  accentD: "#CC5200",
+  accentL: "#FF9500",
+  green:   "#22C55E",
+  red:     "#EF4444",
+  blue:    "#3B82F6",
+  yellow:  "#F59E0B",
+  text:    "#F0F0F0",
+  muted:   "#555",
+  subtle:  "#141414",
+};
 
-/* ── Horários ────────────────────────────── */
-const H_SEM=["05:30","06:30","07:30","12:00","16:30","17:30","18:30","19:30","20:30"];
-const H_SEX=["05:30","06:30","07:30","12:00","16:30","17:30","18:30","19:30"];
-const DIAS=["Seg","Ter","Qua","Qui","Sex"];
-const getDia=()=>{const d=new Date().getDay();if(d===0||d===6)return null;if(d===5)return"Sex";return DIAS[d-1];};
-const getH=(dia)=>dia==="Sex"?H_SEX:H_SEM;
-const AULAS=(()=>{const h=getDia()||"Seg";return getH(h).map((t,i)=>({id:i+1,hora:t,nome:t<"10:00"?"WOD Matinal":t==="12:00"?"WOD Almoço":"WOD Principal",coach:["Rafael","Camila","Thiago"][i%3],vagas:15,ocupadas:[3,8,12,5,7,10,13,6,4][i]||5}));})();
-const PR_DEF=[{id:1,exercicio:"Agachamento",peso:"120kg"},{id:2,exercicio:"Levantamento Terra",peso:"150kg"},{id:3,exercicio:"Clean",peso:"80kg"}];
-const ESPERA_INIT=[{id:1,nome:"Pedro Alves",aula:"WOD Principal 18:30",tipo:"espera",status:"pendente",hora:"14:22"},{id:2,nome:"Juliana Matos",aula:"Aula Experimental",tipo:"experimental",status:"pendente",hora:"13:05"},{id:3,nome:"Ricardo Lima",aula:"WOD Matinal 05:30",tipo:"espera",status:"pendente",hora:"11:47"},{id:4,nome:"Camila Torres",aula:"Aula Experimental",tipo:"experimental",status:"pendente",hora:"10:30"}];
+/* ════════════════════════════════════════════
+   AULAS — estrutura completa por dia
+════════════════════════════════════════════ */
+const H_SEG_QUI = ["05:30","06:30","07:30","12:00","16:30","17:30","18:30","19:30","20:30"];
+const H_SEX     = ["05:30","06:30","07:30","12:00","16:30","17:30","18:30","19:30"];
 
-/* ── Ícones ──────────────────────────────── */
-const P={home:"M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.6 5.4 21 6 21H9M19 10L21 12M19 10V20C19 20.6 18.6 21 18 21H15M9 21C9 21 9 15 12 15C15 15 15 21 15 21M9 21H15",calendar:"M8 2V6M16 2V6M3 10H21M5 4H19C20.1 4 21 4.9 21 6V20C21 21.1 20.1 22 19 22H5C3.9 22 3 21.1 3 20V6C3 4.9 3.9 4 5 4Z",person:"M20 21V19C20 16.8 18.2 15 16 15H8C5.8 15 4 16.8 4 19V21M12 11C14.2 11 16 9.2 16 7C16 4.8 14.2 3 12 3C9.8 3 8 4.8 8 7C8 9.2 9.8 11 12 11Z",bell:"M18 8A6 6 0 006 8C6 15 3 17 3 17H21S18 15 18 8ZM13.73 21A2 2 0 0110.27 21",check:"M9 12L11 14L15 10M21 12C21 16.97 16.97 21 12 21C7.03 21 3 16.97 3 12C3 7.03 7.03 3 12 3C16.97 3 21 7.03 21 12Z",fire:"M12 2C6 8 6 13 9 16C9 13 11 11 12 10C12 13 14 15 14 17C17 15 18 11 15 7C15 10 13 11 12 13C11 11 13 7 12 2Z",users:"M17 21V19C17 16.8 15.2 15 13 15H5C2.8 15 1 16.8 1 19V21M23 21V19C23 17.1 21.7 15.5 20 15.1M16 3.1C17.7 3.5 19 5.1 19 7S17.7 10.5 16 10.9M13 7C13 9.2 11.2 11 9 11C6.8 11 5 9.2 5 7S6.8 3 9 3S13 4.8 13 7Z",x:"M18 6L6 18M6 6L18 18",lock:"M19 11H5C3.9 11 3 11.9 3 13V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V13C21 11.9 20.1 11 19 11ZM12 17C11.4 17 11 16.6 11 16S11.4 15 12 15S13 15.4 13 16S12.6 17 12 17ZM17 11V7C17 4.2 14.8 2 12 2S7 4.2 7 7V11",arrow:"M19 12H5M12 5L5 12L12 19",star:"M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z",eye:"M1 12S5 4 12 4 23 12 23 12 19 20 12 20 1 12 1 12ZM12 15C13.66 15 15 13.66 15 12S13.66 9 12 9 9 10.34 9 12 10.34 15 12 15Z",eyeOff:"M17.94 17.94A10.07 10.07 0 0112 20C5 20 1 12 1 12A18.09 18.09 0 015.06 5.06M9.9 4.24A9.12 9.12 0 0112 4C19 4 23 12 23 12A18.09 18.09 0 0118.94 18.94M1 1L23 23",chevronL:"M15 18L9 12L15 6",chevronR:"M9 18L15 12L9 6",trophy:"M8 21H16M12 17V21M7 4H17L16 11C16 13.76 14.21 16 12 16S8 13.76 8 11L7 4ZM4 7H7M17 7H20"};
-const Icon=({name,size=22,color=C.muted})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={P[name]||""}/></svg>;
+// Aulas de fim de semana gerenciadas pelo admin (salvas no LS)
+const AULAS_FDS_DEFAULT = {
+  sabado:  [
+    {hora:"09:00", nome:"WOD Sábado", coach:"Rafael", vagas:20},
+    {hora:"10:00", nome:"Open Box",   coach:"Camila", vagas:20},
+  ],
+  domingo: [
+    {hora:"09:00", nome:"WOD Domingo", coach:"Thiago", vagas:15},
+  ],
+};
 
-/* ── Atoms ───────────────────────────────── */
-const Logo=({size=32})=><img src="/logoamazonas.png" alt="Amazonas" style={{width:size,height:size,objectFit:"contain",flexShrink:0}}/>;
-const Tag=({children,color})=><span style={{background:color+"20",color,border:`1px solid ${color}40`,borderRadius:6,fontSize:10,fontWeight:700,letterSpacing:1,padding:"2px 8px",textTransform:"uppercase"}}>{children}</span>;
-const Btn=({children,onClick,variant="primary",small,full,disabled,loading})=>{
-  const bg={primary:C.accent,danger:C.red,green:C.green,ghost:C.subtle}[variant]||C.subtle;
-  const fg=(variant==="primary"||variant==="green")?"#000":"#fff",off=disabled||loading;
-  return<button onClick={onClick} disabled={off} style={{background:off?C.subtle:bg,color:off?C.muted:fg,border:"none",borderRadius:10,padding:small?"7px 14px":"12px 20px",fontSize:small?11:13,fontWeight:800,letterSpacing:1,cursor:off?"not-allowed":"pointer",width:full?"100%":"auto",textTransform:"uppercase",fontFamily:"inherit",opacity:off?0.5:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+const getNomeAula = (h) => h < "10:00" ? "WOD Matinal" : h === "12:00" ? "WOD Almoço" : "WOD Principal";
+
+// Retorna info do dia atual
+const getInfoHoje = () => {
+  const now = new Date();
+  const d = now.getDay(); // 0=dom,1=seg,...,6=sab
+  const data = now.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
+  return { dow:d, data };
+};
+
+// Próximos 7 dias a partir de hoje
+const getProximosDias = () => {
+  const dias = [];
+  const hoje = new Date();
+  for(let i=0;i<7;i++){
+    const d = new Date(hoje);
+    d.setDate(hoje.getDate()+i);
+    const dow = d.getDay();
+    const label = i===0 ? "Hoje" : i===1 ? "Amanhã"
+      : d.toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"2-digit"});
+    const tipo = dow===6?"sabado": dow===0?"domingo":
+      dow===5?"sexta":"semana";
+    dias.push({ date:d, dow, label, tipo, dateStr: d.toISOString().slice(0,10) });
+  }
+  return dias;
+};
+
+const getAulasDia = (tipo, fdsConfig) => {
+  if(tipo==="sabado")  return (fdsConfig?.sabado  || AULAS_FDS_DEFAULT.sabado ).map((a,i)=>({...a,id:`sab_${i}`,ocupadas:Math.floor(a.vagas*.6)}));
+  if(tipo==="domingo") return (fdsConfig?.domingo || AULAS_FDS_DEFAULT.domingo).map((a,i)=>({...a,id:`dom_${i}`,ocupadas:Math.floor(a.vagas*.4)}));
+  const horarios = tipo==="sexta" ? H_SEX : H_SEG_QUI;
+  return horarios.map((h,i)=>({ id:`dia_${i}`, hora:h, nome:getNomeAula(h), coach:["Rafael","Camila","Thiago"][i%3], vagas:15, ocupadas:[3,8,12,5,7,10,13,6,4][i]||5 }));
+};
+
+const PR_DEF = [
+  {id:1,exercicio:"Agachamento",peso:"120kg"},
+  {id:2,exercicio:"Levantamento Terra",peso:"150kg"},
+  {id:3,exercicio:"Clean",peso:"80kg"},
+];
+
+const ESPERA_INIT = [
+  {id:1,nome:"Pedro Alves",   aula:"WOD Principal 18:30",tipo:"espera",      status:"pendente",hora:"14:22"},
+  {id:2,nome:"Juliana Matos", aula:"Aula Experimental",  tipo:"experimental",status:"pendente",hora:"13:05"},
+  {id:3,nome:"Ricardo Lima",  aula:"WOD Matinal 05:30",  tipo:"espera",      status:"pendente",hora:"11:47"},
+  {id:4,nome:"Camila Torres", aula:"Aula Experimental",  tipo:"experimental",status:"pendente",hora:"10:30"},
+];
+
+const MOCK_PERFIS = [
+  {id:"1",username:"lucasmendes",   plano:"Mensal",    status:"ativo",  vencimento:"2025-04-30"},
+  {id:"2",username:"anapaulasilva", plano:"Trimestral",status:"ativo",  vencimento:"2025-06-15"},
+  {id:"3",username:"carlosrocha",   plano:"Mensal",    status:"inativo",vencimento:"2025-04-01"},
+  {id:"4",username:"fernandalima",  plano:"Mensal",    status:"ativo",  vencimento:"2025-04-22"},
+  {id:"5",username:"marcossouza",   plano:"Anual",     status:"ativo",  vencimento:"2025-12-10"},
+  {id:"6",username:"beatrizcosta",  plano:"Mensal",    status:"ativo",  vencimento:"2025-04-28"},
+];
+const MOCK_CHECKINS_MES = {"lucasmendes":12,"anapaulasilva":16,"carlosrocha":4,"fernandalima":15,"marcossouza":9,"beatrizcosta":7};
+const gerarCheckinsDia = (d) => {
+  const todos = [
+    {username:"lucasmendes",hora:"06:03",aula:"WOD Matinal"},
+    {username:"anapaulasilva",hora:"06:07",aula:"WOD Matinal"},
+    {username:"marcossouza",hora:"06:15",aula:"WOD Matinal"},
+    {username:"fernandalima",hora:"18:02",aula:"WOD Principal"},
+    {username:"beatrizcosta",hora:"18:10",aula:"WOD Principal"},
+    {username:"carlosrocha",hora:"19:31",aula:"Weightlifting"},
+  ];
+  return todos.slice(0, Math.max(2,(d.getDate()%4)+2));
+};
+const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+/* ═══════════ ÍCONES ══════════════════════ */
+const P = {
+  home:     "M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.6 5.4 21 6 21H9M19 10L21 12M19 10V20C19 20.6 18.6 21 18 21H15M9 21C9 21 9 15 12 15C15 15 15 21 15 21M9 21H15",
+  calendar: "M8 2V6M16 2V6M3 10H21M5 4H19C20.1 4 21 4.9 21 6V20C21 21.1 20.1 22 19 22H5C3.9 22 3 21.1 3 20V6C3 4.9 3.9 4 5 4Z",
+  person:   "M20 21V19C20 16.8 18.2 15 16 15H8C5.8 15 4 16.8 4 19V21M12 11C14.2 11 16 9.2 16 7C16 4.8 14.2 3 12 3C9.8 3 8 4.8 8 7C8 9.2 9.8 11 12 11Z",
+  bell:     "M18 8A6 6 0 006 8C6 15 3 17 3 17H21S18 15 18 8ZM13.73 21A2 2 0 0110.27 21",
+  check:    "M9 12L11 14L15 10M21 12C21 16.97 16.97 21 12 21C7.03 21 3 16.97 3 12C3 7.03 7.03 3 12 3C16.97 3 21 7.03 21 12Z",
+  fire:     "M12 2C6 8 6 13 9 16C9 13 11 11 12 10C12 13 14 15 14 17C17 15 18 11 15 7C15 10 13 11 12 13C11 11 13 7 12 2Z",
+  users:    "M17 21V19C17 16.8 15.2 15 13 15H5C2.8 15 1 16.8 1 19V21M23 21V19C23 17.1 21.7 15.5 20 15.1M16 3.1C17.7 3.5 19 5.1 19 7S17.7 10.5 16 10.9M13 7C13 9.2 11.2 11 9 11C6.8 11 5 9.2 5 7S6.8 3 9 3S13 4.8 13 7Z",
+  x:        "M18 6L6 18M6 6L18 18",
+  lock:     "M19 11H5C3.9 11 3 11.9 3 13V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V13C21 11.9 20.1 11 19 11ZM12 17C11.4 17 11 16.6 11 16S11.4 15 12 15S13 15.4 13 16S12.6 17 12 17ZM17 11V7C17 4.2 14.8 2 12 2S7 4.2 7 7V11",
+  arrow:    "M19 12H5M12 5L5 12L12 19",
+  star:     "M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z",
+  eye:      "M1 12S5 4 12 4 23 12 23 12 19 20 12 20 1 12 1 12ZM12 15C13.66 15 15 13.66 15 12S13.66 9 12 9 9 10.34 9 12 10.34 15 12 15Z",
+  eyeOff:   "M17.94 17.94A10.07 10.07 0 0112 20C5 20 1 12 1 12A18.09 18.09 0 015.06 5.06M9.9 4.24A9.12 9.12 0 0112 4C19 4 23 12 23 12A18.09 18.09 0 0118.94 18.94M1 1L23 23",
+  chevronL: "M15 18L9 12L15 6",
+  chevronR: "M9 18L15 12L9 6",
+  edit:     "M11 4H4C3.4 4 3 4.4 3 5V20C3 20.6 3.4 21 4 21H19C19.6 21 20 20.6 20 20V13M18.5 2.5A2.12 2.12 0 0121 5L12 14L8 15L9 11L18.5 2.5Z",
+  plus:     "M12 5V19M5 12H19",
+  trash:    "M3 6H21M8 6V4H16V6M19 6L18 20C18 20.6 17.6 21 17 21H7C6.4 21 6 20.6 6 20L5 6",
+  warn:     "M10.29 3.86L1.82 18A2 2 0 003.54 21H20.46A2 2 0 0022.18 18L13.71 3.86A2 2 0 0010.29 3.86ZM12 9V13M12 17H12.01",
+};
+const Icon = ({name,size=22,color=C.muted}) =>
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d={P[name]||""}/>
+  </svg>;
+
+/* ═══════════ ATOMS ══════════════════════ */
+const Logo = ({size=32}) =>
+  <img src="/logoamazonas.png" alt="Amazonas" style={{width:size,height:size,objectFit:"contain",flexShrink:0}}/>;
+
+const Tag = ({children,color}) =>
+  <span style={{background:color+"20",color,border:`1px solid ${color}40`,borderRadius:6,fontSize:10,fontWeight:700,letterSpacing:1,padding:"2px 8px",textTransform:"uppercase"}}>{children}</span>;
+
+const Btn = ({children,onClick,variant="primary",small,full,disabled,loading}) => {
+  const bg = {primary:C.accent,danger:C.red,green:C.green,ghost:C.subtle}[variant]||C.subtle;
+  const fg = (variant==="primary"||variant==="green")?"#000":"#fff", off=disabled||loading;
+  return <button onClick={onClick} disabled={off} style={{background:off?C.subtle:bg,color:off?C.muted:fg,border:"none",borderRadius:10,padding:small?"7px 14px":"12px 20px",fontSize:small?11:13,fontWeight:800,letterSpacing:1,cursor:off?"not-allowed":"pointer",width:full?"100%":"auto",textTransform:"uppercase",fontFamily:"inherit",opacity:off?0.5:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
     {loading&&<span style={{width:13,height:13,border:"2px solid currentColor",borderTopColor:"transparent",borderRadius:"50%",animation:"spin .7s linear infinite",display:"inline-block"}}/>}
-    {children}</button>;};
-const Card=({children,style={},highlight})=><div style={{background:C.card,border:`1px solid ${highlight?highlight+"55":C.border}`,borderRadius:14,padding:16,marginBottom:12,...style}}>{children}</div>;
-const Bar=({value,max,color=C.accent,thin})=><div style={{height:thin?4:6,background:C.subtle,borderRadius:6,overflow:"hidden"}}><div style={{width:`${Math.min((value/max)*100,100)}%`,height:"100%",background:color,borderRadius:6,transition:"width .5s"}}/></div>;
-const Divider=()=><div style={{height:1,background:C.border,margin:"12px 0"}}/>;
-const Avatar=({nome="?",size=36,color=C.accent})=><div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*.4,fontWeight:900,color}}>{(nome||"?")[0].toUpperCase()}</div>;
+    {children}
+  </button>;
+};
 
-const PasswordInput=({value,onChange,placeholder="Senha",onKeyDown})=>{
-  const[show,setShow]=useState(false);
-  const inp={width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px 48px 14px 16px",color:C.text,fontSize:15,fontFamily:"inherit",boxSizing:"border-box"};
-  return<div style={{position:"relative"}}>
-    <input type={show?"text":"password"} value={value} onChange={onChange} onKeyDown={onKeyDown} placeholder={placeholder} style={inp}/>
+const Card = ({children,style={},highlight}) =>
+  <div style={{background:C.card,border:`1px solid ${highlight?highlight+"55":C.border}`,borderRadius:14,padding:16,marginBottom:12,...style}}>{children}</div>;
+
+const Bar = ({value,max,color=C.accent,thin}) =>
+  <div style={{height:thin?4:6,background:C.subtle,borderRadius:6,overflow:"hidden"}}>
+    <div style={{width:`${Math.min((value/max)*100,100)}%`,height:"100%",background:color,borderRadius:6,transition:"width .5s"}}/>
+  </div>;
+
+const Divider = () => <div style={{height:1,background:C.border,margin:"12px 0"}}/>;
+
+const Avatar = ({nome="?",size=36,color=C.accent}) =>
+  <div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*.4,fontWeight:900,color}}>{(nome||"?")[0].toUpperCase()}</div>;
+
+const PasswordInput = ({value,onChange,placeholder="Senha",onKeyDown,id}) => {
+  const [show,setShow] = useState(false);
+  const s = {width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px 48px 14px 16px",color:C.text,fontSize:15,fontFamily:"inherit",boxSizing:"border-box"};
+  return <div style={{position:"relative"}}>
+    <input id={id} type={show?"text":"password"} value={value} onChange={onChange} onKeyDown={onKeyDown} placeholder={placeholder} style={s}/>
     <button onClick={()=>setShow(!show)} type="button" style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",padding:4,display:"flex"}}>
       <Icon name={show?"eyeOff":"eye"} size={18} color={C.muted}/>
     </button>
-  </div>;};
+  </div>;
+};
 
 /* ════════════════════════════════════════════
    LOGIN
 ════════════════════════════════════════════ */
 function LoginScreen({onLogin,onAdmin}){
-  const[modo,setModo]=useState("login"); // login | cadastro | recuperar
-  const[user,setUser]=useState(""),  [senha,setSenha]=useState(""),  [confirma,setConfirma]=useState("");
-  const[loading,setLoading]=useState(false),  [erro,setErro]=useState(""),  [sucesso,setSucesso]=useState("");
-  const[showAdmin,setShowAdmin]=useState(false),  [adminUser,setAdminUser]=useState(""),  [adminPass,setAdminPass]=useState(""),  [adminErro,setAdminErro]=useState("");
+  const [modo,setModo]     = useState("login");
+  const [user,setUser]     = useState(""),  [senha,setSenha]=useState(""),  [confirma,setConfirma]=useState("");
+  const [loading,setLoading]=useState(false),[erro,setErro]=useState(""),  [sucesso,setSucesso]=useState("");
+  const [showAdmin,setShowAdmin]=useState(false),[adminUser,setAdminUser]=useState(""),[adminPass,setAdminPass]=useState(""),[adminErro,setAdminErro]=useState("");
+  // Atrasa aparecer o conteúdo para não sobrepor splash
+  const [visible,setVisible]=useState(false);
+  useEffect(()=>{ const t=setTimeout(()=>setVisible(true),2000); return()=>clearTimeout(t); },[]);
 
-  const limpar=()=>{setErro("");setSucesso("");};
-  const inp={width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px 16px",color:C.text,fontSize:15,fontFamily:"inherit",boxSizing:"border-box"};
+  const limpar = ()=>{setErro("");setSucesso("");};
+  const inp    = {width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px 16px",color:C.text,fontSize:15,fontFamily:"inherit",boxSizing:"border-box"};
 
-  const handleLogin=async()=>{
+  const handleLogin = async()=>{
     if(!user.trim()||!senha){setErro("Preencha usuário e senha.");return;}
     if(!sb){setErro("Configuração pendente. Contate o administrador.");return;}
     setLoading(true);limpar();
-    const email=toEmail(user);
-    const{error,data}=await sb.auth.signInWithPassword({email,password:senha});
+    const {error,data} = await sb.auth.signInWithPassword({email:toEmail(user),password:senha});
     setLoading(false);
-    if(error)setErro("Usuário ou senha incorretos.");
-    else onLogin(data.user,user.trim());
+    if(error){
+      if(error.message.includes("Email not confirmed"))
+        setErro("E-mail não confirmado. Desative 'Enable email confirmations' em Supabase → Auth → Settings.");
+      else if(error.message.includes("Invalid login")||error.message.includes("Invalid credentials"))
+        setErro("Usuário ou senha incorretos.");
+      else setErro("Erro: "+error.message);
+    } else onLogin(data.user,user.trim());
   };
 
-  const handleCadastro=async()=>{
+  const handleCadastro = async()=>{
     if(!user.trim()||!senha){setErro("Preencha todos os campos.");return;}
     if(senha.length<6){setErro("Senha precisa ter ao menos 6 caracteres.");return;}
     if(senha!==confirma){setErro("As senhas não coincidem.");return;}
-    if(!sb){setErro("Configuração pendente. Contate o administrador.");return;}
+    if(!sb){setErro("Configuração pendente.");return;}
     setLoading(true);limpar();
-    const email=toEmail(user);
-    const{error}=await sb.auth.signUp({email,password:senha,options:{data:{username:user.trim()}}});
+    const {error,data} = await sb.auth.signUp({email:toEmail(user),password:senha,options:{data:{username:user.trim()}}});
     setLoading(false);
-    if(error)setErro(error.message.includes("already")?"Este usuário já existe.":"Erro ao criar conta. Tente outro nome de usuário.");
-    else{setSucesso("Conta criada com sucesso! Faça login agora.");setModo("login");setSenha("");setConfirma("");}
-  };
-
-  const handleAdminLogin=()=>{
-    if(adminUser.trim().toLowerCase()===ADMIN_USER && adminPass.toLowerCase()===ADMIN_PASS){
-      onAdmin();
+    if(error){
+      setErro(error.message.includes("already")||error.message.includes("User already registered")
+        ?"Este usuário já existe. Tente outro nome."
+        :"Erro: "+error.message);
+    } else if(data?.session){
+      onLogin(data.user,user.trim());
     } else {
-      setAdminErro("Credenciais incorretas.");
+      setErro("Conta criada, mas confirmação de e-mail está ativa. Desative em Supabase → Auth → Settings.");
+      setModo("login");
     }
   };
 
+  const handleAdminLogin = ()=>{
+    if(adminUser.trim().toLowerCase()===ADMIN_USER&&adminPass.toLowerCase()===ADMIN_PASS) onAdmin();
+    else setAdminErro("Credenciais incorretas.");
+  };
+
+  if(!visible) return <div style={{minHeight:"100vh",background:C.bg}}/>;
+
   return(
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
-      <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}} @keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,animation:"fadeIn .5s ease"}}>
 
-      {/* Logo */}
-      <div style={{textAlign:"center",marginBottom:32,animation:"fadeIn .5s ease"}}>
-        <img src="/logoamazonas.png" alt="Amazonas" style={{width:130,height:130,objectFit:"contain",marginBottom:4}}/>
-      </div>
+      {!showAdmin && <>
+        {/* Logo só o desenho */}
+        <div style={{marginBottom:36}}>
+          <img src="/logoamazonas.png" alt="Amazonas" style={{width:120,height:120,objectFit:"contain",display:"block"}}/>
+        </div>
 
-      {/* Formulário principal */}
-      {!showAdmin && (
-        <div style={{width:"100%",maxWidth:340,animation:"fadeIn .4s ease .1s both"}}>
-          {/* Tabs */}
-          {modo!=="recuperar" && (
+        <div style={{width:"100%",maxWidth:340}}>
+          {modo!=="recuperar"&&(
             <div style={{display:"flex",background:C.subtle,borderRadius:12,padding:4,marginBottom:22}}>
               {[["login","Entrar"],["cadastro","Criar conta"]].map(([m,l])=>(
                 <button key={m} onClick={()=>{setModo(m);limpar();setSenha("");setConfirma("");}} style={{flex:1,background:modo===m?C.accent:"none",color:modo===m?"#000":C.muted,border:"none",borderRadius:10,padding:"10px",fontWeight:800,fontSize:13,letterSpacing:1,cursor:"pointer",fontFamily:"inherit",textTransform:"uppercase"}}>{l}</button>
               ))}
             </div>
           )}
-
-          {modo==="recuperar" && (
+          {modo==="recuperar"&&(
             <div style={{marginBottom:18}}>
               <button onClick={()=>{setModo("login");limpar();}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit",fontSize:12,fontWeight:700}}>
                 <Icon name="arrow" size={14} color={C.muted}/> Voltar
               </button>
               <div style={{fontSize:20,fontWeight:900,marginTop:10,marginBottom:4}}>Recuperar acesso</div>
-              <div style={{fontSize:13,color:C.muted}}>Entre em contato com o administrador do box para redefinir sua senha.</div>
+              <div style={{fontSize:13,color:C.muted}}>Entre em contato com o administrador do box.</div>
             </div>
           )}
-
           {sucesso&&<div style={{background:C.green+"18",border:`1px solid ${C.green}44`,borderRadius:12,padding:"12px 14px",marginBottom:14,fontSize:13,fontWeight:700,color:C.green}}>✅ {sucesso}</div>}
-
           <div style={{marginBottom:10}}>
             <input value={user} onChange={e=>{setUser(e.target.value);limpar();}} placeholder="Nome de usuário" style={inp}
-              onKeyDown={e=>modo==="login"&&e.key==="Enter"&&document.getElementById("inp-senha")?.focus()}/>
+              onKeyDown={e=>e.key==="Enter"&&document.getElementById("inp-s")?.focus()}/>
           </div>
-
           {modo!=="recuperar"&&(
             <div style={{marginBottom:10}}>
-              <PasswordInput value={senha} onChange={e=>{setSenha(e.target.value);limpar();}} placeholder="Senha"
-                onKeyDown={e=>e.key==="Enter"&&(modo==="login"?handleLogin():(confirma?handleCadastro():document.getElementById("inp-confirma")?.focus()))}/>
+              <PasswordInput id="inp-s" value={senha} onChange={e=>{setSenha(e.target.value);limpar();}} placeholder="Senha"
+                onKeyDown={e=>e.key==="Enter"&&(modo==="login"?handleLogin():document.getElementById("inp-c")?.focus())}/>
             </div>
           )}
-
           {modo==="cadastro"&&(
             <div style={{marginBottom:10}}>
-              <div style={{position:"relative"}}>
-                <input id="inp-confirma" type="password" value={confirma} onChange={e=>{setConfirma(e.target.value);limpar();}}
-                  onKeyDown={e=>e.key==="Enter"&&handleCadastro()}
-                  placeholder="Confirmar senha" style={inp}/>
-              </div>
+              <PasswordInput id="inp-c" value={confirma} onChange={e=>{setConfirma(e.target.value);limpar();}} placeholder="Confirmar senha"
+                onKeyDown={e=>e.key==="Enter"&&handleCadastro()}/>
             </div>
           )}
-
-          {erro&&<div style={{fontSize:12,color:C.red,fontWeight:700,marginBottom:10,padding:"8px 12px",background:C.red+"14",borderRadius:8,border:`1px solid ${C.red}33`}}>⚠️ {erro}</div>}
-
+          {erro&&<div style={{fontSize:12,color:C.red,fontWeight:700,marginBottom:10,padding:"8px 12px",background:C.red+"14",borderRadius:8,border:`1px solid ${C.red}33`,lineHeight:1.5}}>⚠️ {erro}</div>}
           <div style={{marginTop:14}}>
             {modo==="login"&&<>
               <Btn full loading={loading} onClick={handleLogin}>Entrar</Btn>
@@ -240,31 +423,28 @@ function LoginScreen({onLogin,onAdmin}){
             {modo==="cadastro"&&<Btn full loading={loading} onClick={handleCadastro}>Criar conta</Btn>}
             {modo==="recuperar"&&<Btn full variant="ghost" onClick={()=>setModo("login")}>Voltar ao login</Btn>}
           </div>
-
-          {/* Botão admin discreto */}
-          <div style={{marginTop:32,textAlign:"center"}}>
-            <button onClick={()=>setShowAdmin(true)} style={{background:"none",border:"none",color:"#2a2a2a",fontSize:10,cursor:"pointer",fontFamily:"inherit",letterSpacing:1}}>
-              ···
-            </button>
+          {/* botão admin ultradiscreto */}
+          <div style={{marginTop:36,textAlign:"center"}}>
+            <button onClick={()=>setShowAdmin(true)} style={{background:"none",border:"none",color:"#1a1a1a",fontSize:11,cursor:"pointer",fontFamily:"inherit",letterSpacing:2}}>···</button>
           </div>
         </div>
-      )}
+      </>}
 
-      {/* Painel admin login */}
-      {showAdmin && (
+      {showAdmin&&(
         <div style={{width:"100%",maxWidth:340,animation:"fadeIn .3s ease"}}>
-          <button onClick={()=>{setShowAdmin(false);setAdminErro("");setAdminUser("");setAdminPass("");}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit",fontSize:12,fontWeight:700,marginBottom:16}}>
+          <button onClick={()=>{setShowAdmin(false);setAdminErro("");}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit",fontSize:12,fontWeight:700,marginBottom:20}}>
             <Icon name="arrow" size={14} color={C.muted}/> Voltar
           </button>
-          <div style={{textAlign:"center",marginBottom:20}}>
-            <div style={{width:44,height:44,borderRadius:12,background:C.accent+"22",border:`1px solid ${C.accent}33`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px"}}>
-              <Icon name="lock" size={20} color={C.accent}/>
+          <div style={{textAlign:"center",marginBottom:24}}>
+            <div style={{width:48,height:48,borderRadius:12,background:C.accent+"22",border:`1px solid ${C.accent}33`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px"}}>
+              <Icon name="lock" size={22} color={C.accent}/>
             </div>
             <div style={{fontSize:18,fontWeight:900}}>Acesso Administrativo</div>
           </div>
           <div style={{marginBottom:10}}>
             <input value={adminUser} onChange={e=>{setAdminUser(e.target.value);setAdminErro("");}} placeholder="Usuário admin"
-              onKeyDown={e=>e.key==="Enter"&&handleAdminLogin()} style={inp}/>
+              onKeyDown={e=>e.key==="Enter"&&handleAdminLogin()}
+              style={{width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px 16px",color:C.text,fontSize:15,fontFamily:"inherit",boxSizing:"border-box"}}/>
           </div>
           <div style={{marginBottom:10}}>
             <PasswordInput value={adminPass} onChange={e=>{setAdminPass(e.target.value);setAdminErro("");}} placeholder="Senha admin"
@@ -284,14 +464,17 @@ function LoginScreen({onLogin,onAdmin}){
 function InstallPopup({onClose,onNever}){
   const ua=navigator.userAgent,isIOS=/iphone|ipad|ipod/i.test(ua),isAndroid=/android/i.test(ua);
   const showIOS=isIOS||(!isIOS&&!isAndroid),showAndroid=isAndroid||(!isIOS&&!isAndroid);
-  const Step=({n,text})=><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:22,height:22,borderRadius:"50%",background:C.accent,color:"#000",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n}</div><span style={{fontSize:13,color:C.text,fontWeight:600}}>{text}</span></div>;
+  const Step=({n,text})=><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+    <div style={{width:22,height:22,borderRadius:"50%",background:C.accent,color:"#000",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n}</div>
+    <span style={{fontSize:13,color:C.text,fontWeight:600}}>{text}</span>
+  </div>;
   return(
-    <div style={{position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+    <div style={{position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,0.85)",backdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div style={{background:C.surface,borderRadius:"20px 20px 0 0",border:`1px solid ${C.border}`,padding:"20px 20px 40px",width:"100%",maxWidth:430,animation:"slideUp .3s ease"}}>
         <div style={{width:40,height:4,background:C.border,borderRadius:4,margin:"0 auto 20px"}}/>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-          <Logo size={48}/>
-          <div><div style={{fontSize:18,fontWeight:900,color:C.accent,letterSpacing:1}}>AMAZONAS</div><div style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:2}}>ALTA PERFORMANCE</div></div>
+          <Logo size={44}/>
+          <div><div style={{fontSize:17,fontWeight:900,color:C.accent,letterSpacing:1}}>AMAZONAS</div><div style={{fontSize:10,fontWeight:700,color:C.muted,letterSpacing:2}}>ALTA PERFORMANCE</div></div>
         </div>
         <div style={{fontSize:19,fontWeight:900,marginBottom:6}}>Adicione à tela inicial! 📲</div>
         <div style={{fontSize:13,color:C.muted,lineHeight:1.6,marginBottom:14}}>Acesse mais rápido e receba lembretes de aulas sem abrir o navegador.</div>
@@ -318,117 +501,245 @@ function InstallPopup({onClose,onNever}){
   );
 }
 
-/* ── Notif Banner ────────────────────────── */
 function NotifBanner({aula,onDismiss}){
-  return<div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,zIndex:500,background:`linear-gradient(90deg,${C.accentD},${C.accent})`,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+  return <div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,zIndex:500,background:`linear-gradient(90deg,${C.accentD},${C.accent})`,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
     <div style={{display:"flex",alignItems:"center",gap:10}}>
       <Icon name="bell" size={18} color="#000"/>
-      <div><div style={{fontSize:12,fontWeight:900,color:"#000"}}>🔔 Sua aula começa em 10 min!</div><div style={{fontSize:11,color:"rgba(0,0,0,0.65)",fontWeight:700}}>{aula.hora} · {aula.nome} · Coach {aula.coach}</div></div>
+      <div><div style={{fontSize:12,fontWeight:900,color:"#000"}}>🔔 Sua aula começa em 10 min!</div><div style={{fontSize:11,color:"rgba(0,0,0,.65)",fontWeight:700}}>{aula.hora} · {aula.nome} · Coach {aula.coach}</div></div>
     </div>
     <button onClick={onDismiss} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Icon name="x" size={16} color="#000"/></button>
   </div>;
 }
 
 /* ════════════════════════════════════════════
-   TELAS DO ALUNO
+   TELA: HOME
 ════════════════════════════════════════════ */
-function HomeScreen({username,reservas,setReservas,setTab,notifPerm,onAtivarNotif,prs}){
+function HomeScreen({username,reservas,setReservas,setTab,notifPerm,onAtivarNotif,prs,fdsConfig}){
   const checkins=12,meta=15,streak=5,atingiu=checkins>=meta;
-  const proxima=AULAS.find(a=>reservas.includes(a.id));
   const diasGrid=Array.from({length:20},(_,i)=>i+1);
   const presentes=[1,2,4,5,7,9,10,12,13,14,15,16];
   const nomeFmt=(username||"Aluno").charAt(0).toUpperCase()+(username||"Aluno").slice(1);
+  // Próxima aula reservada (qualquer dia)
+  const proxima = (() => {
+    const dias = getProximosDias();
+    for(const dia of dias){
+      const aulas = getAulasDia(dia.tipo, fdsConfig);
+      const res = aulas.find(a=>reservas.includes(dia.dateStr+"_"+a.id));
+      if(res) return {...res, label:dia.label, dateStr:dia.dateStr};
+    }
+    return null;
+  })();
+
   return(
     <div style={{animation:"fadeIn .4s ease"}}>
       <div style={{background:`linear-gradient(135deg,${C.accentD},${C.accent} 70%,#FF9500)`,borderRadius:18,padding:"22px 20px",marginBottom:14,position:"relative",overflow:"hidden"}}>
-        <div style={{position:"absolute",right:-20,top:-20,width:110,height:110,borderRadius:"50%",background:"rgba(255,255,255,0.07)"}}/>
-        <p style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"rgba(0,0,0,0.5)",textTransform:"uppercase",marginBottom:3}}>{new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"short"})}</p>
+        <div style={{position:"absolute",right:-20,top:-20,width:110,height:110,borderRadius:"50%",background:"rgba(255,255,255,.07)"}}/>
+        <p style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"rgba(0,0,0,.5)",textTransform:"uppercase",marginBottom:3}}>
+          {new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"})}
+        </p>
         <h1 style={{fontSize:26,fontWeight:900,color:"#000",marginBottom:3,lineHeight:1.1}}>Bom dia, {nomeFmt}! 🔥</h1>
-        <p style={{fontSize:13,color:"rgba(0,0,0,0.55)",fontWeight:600,marginBottom:14}}>{streak} dias seguidos · Mensal</p>
-        <div style={{background:"rgba(0,0,0,0.18)",borderRadius:10,padding:"10px 14px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:11,fontWeight:800,color:"rgba(0,0,0,0.6)",textTransform:"uppercase",letterSpacing:1}}>Check-ins este mês</span><span style={{fontSize:13,fontWeight:900,color:"#000"}}>{checkins}/{meta} {atingiu?"🏆":""}</span></div>
-          <Bar value={checkins} max={meta} color={atingiu?"rgba(0,0,0,0.6)":"rgba(0,0,0,0.4)"}/>
-          <p style={{fontSize:10,color:"rgba(0,0,0,0.5)",fontWeight:700,marginTop:6}}>{atingiu?"✅ Meta atingida! Você está isento pelo resto do mês.":`Faltam ${meta-checkins} check-ins para ficar isento!`}</p>
+        <p style={{fontSize:13,color:"rgba(0,0,0,.55)",fontWeight:600,marginBottom:14}}>{streak} dias seguidos · Mensal</p>
+        <div style={{background:"rgba(0,0,0,.18)",borderRadius:10,padding:"10px 14px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+            <span style={{fontSize:11,fontWeight:800,color:"rgba(0,0,0,.6)",textTransform:"uppercase",letterSpacing:1}}>Check-ins este mês</span>
+            <span style={{fontSize:13,fontWeight:900,color:"#000"}}>{checkins}/{meta} {atingiu?"🏆":""}</span>
+          </div>
+          <Bar value={checkins} max={meta} color={atingiu?"rgba(0,0,0,.6)":"rgba(0,0,0,.4)"}/>
+          <p style={{fontSize:10,color:"rgba(0,0,0,.5)",fontWeight:700,marginTop:6}}>
+            {atingiu?"✅ Meta atingida! Você está isento pelo resto do mês.":`Faltam ${meta-checkins} check-ins para ficar isento!`}
+          </p>
         </div>
       </div>
-      {atingiu&&<div style={{background:C.green+"18",border:`1px solid ${C.green}44`,borderRadius:12,padding:"12px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:20}}>🏆</span><div><div style={{fontSize:13,fontWeight:800,color:C.green}}>Você está isento este mês!</div><div style={{fontSize:11,color:C.muted}}>Atingiu 15 check-ins — sem obrigação nos dias restantes.</div></div></div>}
-      {proxima?(<Card highlight={C.accent}>
-        <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.accent,textTransform:"uppercase",marginBottom:10}}>✅ Sua próxima aula</div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <div><div style={{fontSize:26,fontWeight:900,color:C.accent}}>{proxima.hora}</div><div style={{fontSize:16,fontWeight:800}}>{proxima.nome}</div><div style={{fontSize:12,color:C.muted,marginTop:2}}>Coach {proxima.coach}</div></div>
-          <div style={{background:C.accent+"18",border:`1px solid ${C.accent}33`,borderRadius:10,padding:"10px 12px",textAlign:"center"}}><div style={{fontSize:18}}>🔔</div><div style={{fontSize:9,fontWeight:700,color:C.accent,letterSpacing:.5,marginTop:2}}>LEMBRETE<br/>ATIVO</div></div>
+
+      {atingiu&&<div style={{background:C.green+"18",border:`1px solid ${C.green}44`,borderRadius:12,padding:"12px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
+        <span style={{fontSize:20}}>🏆</span>
+        <div><div style={{fontSize:13,fontWeight:800,color:C.green}}>Você está isento este mês!</div><div style={{fontSize:11,color:C.muted}}>Atingiu 15 check-ins — sem obrigação nos dias restantes.</div></div>
+      </div>}
+
+      {proxima ? (
+        <Card highlight={C.accent}>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.accent,textTransform:"uppercase",marginBottom:10}}>✅ Próxima aula — {proxima.label}</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div>
+              <div style={{fontSize:26,fontWeight:900,color:C.accent}}>{proxima.hora}</div>
+              <div style={{fontSize:16,fontWeight:800}}>{proxima.nome}</div>
+              <div style={{fontSize:12,color:C.muted,marginTop:2}}>Coach {proxima.coach}</div>
+            </div>
+            <div style={{background:C.accent+"18",border:`1px solid ${C.accent}33`,borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+              <div style={{fontSize:18}}>🔔</div>
+              <div style={{fontSize:9,fontWeight:700,color:C.accent,letterSpacing:.5,marginTop:2}}>LEMBRETE<br/>ATIVO</div>
+            </div>
+          </div>
+          <Divider/>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8}}>Não esqueça do check-in:</div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>window.open("https://wellhub.com","_blank")} style={{flex:1,background:"#1B4DCC",border:"none",borderRadius:10,padding:"11px 8px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              <span style={{fontSize:18}}>💪</span><span style={{fontSize:12,fontWeight:800,color:"#fff"}}>Wellhub</span>
+            </button>
+            <button onClick={()=>window.open("https://totalpass.com","_blank")} style={{flex:1,background:"#7C3AED",border:"none",borderRadius:10,padding:"11px 8px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              <span style={{fontSize:18}}>⚡</span><span style={{fontSize:12,fontWeight:800,color:"#fff"}}>Totalpass</span>
+            </button>
+          </div>
+        </Card>
+      ) : (
+        <Card>
+          <div style={{textAlign:"center",padding:"6px 0"}}>
+            <div style={{fontSize:13,color:C.muted,fontWeight:700,marginBottom:10}}>Nenhuma aula reservada</div>
+            <Btn small onClick={()=>setTab("aulas")}>Ver horários →</Btn>
+          </div>
+        </Card>
+      )}
+
+      {notifPerm!=="granted"&&<div style={{background:C.subtle,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 14px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <Icon name="bell" size={18} color={C.accent}/>
+          <div><div style={{fontSize:13,fontWeight:800}}>Ativar lembretes</div><div style={{fontSize:11,color:C.muted}}>Aviso 10 min antes da aula</div></div>
         </div>
-        <Divider/>
-        <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8}}>Não esqueça do check-in no app:</div>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>window.open("https://wellhub.com","_blank")} style={{flex:1,background:"#1B4DCC",border:"none",borderRadius:10,padding:"11px 8px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span style={{fontSize:18}}>💪</span><span style={{fontSize:12,fontWeight:800,color:"#fff"}}>Wellhub</span></button>
-          <button onClick={()=>window.open("https://totalpass.com","_blank")} style={{flex:1,background:"#7C3AED",border:"none",borderRadius:10,padding:"11px 8px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span style={{fontSize:18}}>⚡</span><span style={{fontSize:12,fontWeight:800,color:"#fff"}}>Totalpass</span></button>
-        </div>
-        <p style={{fontSize:10,color:C.muted,marginTop:8,textAlign:"center",fontWeight:600}}>Abre o app direto — é só confirmar sua presença no box</p>
-      </Card>):(<Card><div style={{textAlign:"center",padding:"6px 0"}}><div style={{fontSize:13,color:C.muted,fontWeight:700,marginBottom:10}}>Nenhuma aula reservada para hoje</div><Btn small onClick={()=>setTab("aulas")}>Ver horários →</Btn></div></Card>)}
-      {notifPerm!=="granted"&&<div style={{background:C.subtle,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 14px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Icon name="bell" size={18} color={C.accent}/><div><div style={{fontSize:13,fontWeight:800}}>Ativar lembretes</div><div style={{fontSize:11,color:C.muted}}>Aviso 10 min antes da aula</div></div></div><Btn small onClick={onAtivarNotif}>Ativar</Btn></div>}
+        <Btn small onClick={onAtivarNotif}>Ativar</Btn>
+      </div>}
+
       <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8}}>Meus PRs</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
-        {prs.length===0?<div style={{gridColumn:"1/-1",background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:12,textAlign:"center",fontSize:12,color:C.muted}}>Adicione PRs na aba Perfil</div>
-          :prs.map(pr=><div key={pr.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 10px",textAlign:"center"}}><div style={{fontSize:18,fontWeight:900,color:C.accent}}>{pr.peso}</div><div style={{fontSize:9,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pr.exercicio}</div></div>)}
+        {prs.length===0
+          ?<div style={{gridColumn:"1/-1",background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:12,textAlign:"center",fontSize:12,color:C.muted}}>Adicione PRs na aba Perfil</div>
+          :prs.map(pr=><div key={pr.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
+            <div style={{fontSize:18,fontWeight:900,color:C.accent}}>{pr.peso}</div>
+            <div style={{fontSize:9,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pr.exercicio}</div>
+          </div>)}
       </div>
+
       <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8}}>Frequência — Este mês</div>
-      <Card><div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>{diasGrid.map(d=><div key={d} style={{aspectRatio:"1",borderRadius:6,background:presentes.includes(d)?C.accent:C.subtle,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:presentes.includes(d)?"#000":C.muted}}>{d}</div>)}</div></Card>
+      <Card><div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
+        {diasGrid.map(d=><div key={d} style={{aspectRatio:"1",borderRadius:6,background:presentes.includes(d)?C.accent:C.subtle,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:presentes.includes(d)?"#000":C.muted}}>{d}</div>)}
+      </div></Card>
     </div>
   );
 }
 
-function AulasScreen({reservas,setReservas}){
-  const hoje=getDia(),diasDisp=hoje?DIAS.slice(DIAS.indexOf(hoje)):DIAS;
-  const[diaIdx,setDiaIdx]=useState(0);
-  const diaSel=diasDisp[diaIdx]||"Seg";
-  const aulasDia=getH(diaSel).map((h,i)=>({id:diaIdx*100+i,hora:h,nome:h<"10:00"?"WOD Matinal":h==="12:00"?"WOD Almoço":"WOD Principal",coach:["Rafael","Camila","Thiago"][i%3],vagas:15,ocupadas:[3,8,12,5,7,10,13,6,4][i]||5}));
+/* ════════════════════════════════════════════
+   TELA: AULAS — navegação por data real
+════════════════════════════════════════════ */
+function AulasScreen({reservas,setReservas,aulasCanceladas,fdsConfig}){
+  const dias = getProximosDias();
+  const [diaIdx,setDiaIdx] = useState(0);
+  const diaSel = dias[diaIdx];
+  const aulasDia = getAulasDia(diaSel.tipo, fdsConfig);
+
+  const fds = diaSel.tipo==="sabado"||diaSel.tipo==="domingo";
+
   return(
     <div style={{animation:"fadeIn .4s ease"}}>
-      <h2 style={{fontSize:26,fontWeight:900,letterSpacing:1,marginBottom:4}}>AULAS</h2>
-      <p style={{fontSize:13,color:C.muted,marginBottom:14}}>Seg–Qui: 9 horários · Sex: 8 · Sáb/Dom: treino especial</p>
-      <div style={{background:`linear-gradient(120deg,${C.accentD},${C.accent})`,borderRadius:14,padding:"16px 18px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div><div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:"rgba(0,0,0,0.5)",textTransform:"uppercase"}}>Convide um amigo</div><div style={{fontSize:18,fontWeight:900,color:"#000",marginTop:2}}>Aula Experimental</div><div style={{fontSize:12,color:"rgba(0,0,0,0.55)",marginTop:3}}>Grátis · Sem compromisso</div></div>
+      <h2 style={{fontSize:26,fontWeight:900,letterSpacing:1,marginBottom:2}}>AULAS</h2>
+      <p style={{fontSize:12,color:C.muted,marginBottom:14}}>
+        Seg–Qui: 9 horários · Sex: 8 horários · Sáb/Dom: treino especial
+      </p>
+
+      {/* Aula experimental */}
+      <div style={{background:`linear-gradient(120deg,${C.accentD},${C.accent})`,borderRadius:14,padding:"14px 18px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:"rgba(0,0,0,.5)",textTransform:"uppercase"}}>Convide um amigo</div>
+          <div style={{fontSize:17,fontWeight:900,color:"#000",marginTop:2}}>Aula Experimental</div>
+          <div style={{fontSize:12,color:"rgba(0,0,0,.55)",marginTop:2}}>Grátis · Sem compromisso</div>
+        </div>
         <Btn small onClick={()=>alert("Solicitação enviada! O coach confirma em breve.")}>Agendar</Btn>
       </div>
+
+      {/* Seletor de dias com data real */}
       <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:4}}>
-        {diasDisp.map((d,i)=><button key={d} onClick={()=>setDiaIdx(i)} style={{background:i===diaIdx?C.accent:C.subtle,color:i===diaIdx?"#000":C.muted,border:"none",borderRadius:10,padding:"8px 18px",fontWeight:800,fontSize:12,letterSpacing:1,cursor:"pointer",fontFamily:"inherit",textTransform:"uppercase",whiteSpace:"nowrap",flexShrink:0}}>{i===0?"Hoje":d}</button>)}
+        {dias.map((d,i)=>(
+          <button key={i} onClick={()=>setDiaIdx(i)} style={{
+            background:i===diaIdx?C.accent:C.subtle,
+            color:i===diaIdx?"#000":C.muted,
+            border:"none",borderRadius:10,padding:"8px 14px",
+            fontWeight:800,fontSize:11,letterSpacing:.5,
+            cursor:"pointer",fontFamily:"inherit",
+            textTransform:"uppercase",whiteSpace:"nowrap",flexShrink:0,
+            lineHeight:1.3,textAlign:"center",
+          }}>
+            {d.label}
+          </button>
+        ))}
       </div>
+
+      {fds&&<div style={{background:C.accent+"18",border:`1px solid ${C.accent}33`,borderRadius:10,padding:"10px 14px",marginBottom:12}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.accent}}>🏋️ Treino especial de fim de semana</div>
+        <div style={{fontSize:11,color:C.muted,marginTop:2}}>Horários e aulas definidos pelo coach</div>
+      </div>}
+
+      {aulasDia.length===0&&<Card><div style={{textAlign:"center",padding:"16px 0",color:C.muted,fontSize:13,fontWeight:700}}>Nenhuma aula programada para este dia</div></Card>}
+
       {aulasDia.map(a=>{
-        const cheia=a.ocupadas>=a.vagas,res=reservas.includes(a.id),pct=a.ocupadas/a.vagas,cor=pct>=1?C.red:pct>=.75?C.accent:C.green;
-        return<Card key={a.id} highlight={res?C.accent:null}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}><div><div style={{fontSize:24,fontWeight:900,color:res?C.accent:C.text}}>{a.hora}</div><div style={{fontSize:15,fontWeight:800,marginTop:1}}>{a.nome}</div><div style={{fontSize:12,color:C.muted,marginTop:2}}>Coach {a.coach}</div></div>{res?<Tag color={C.accent}>✓ Reservado</Tag>:cheia?<Tag color={C.red}>Lotado</Tag>:<Tag color={C.green}>Disponível</Tag>}</div>
-          <div style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:10,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>Vagas</span><span style={{fontSize:12,fontWeight:800,color:cor}}>{a.ocupadas}/{a.vagas}</span></div><Bar value={a.ocupadas} max={a.vagas} color={cor} thin/></div>
-          {res?<Btn full variant="ghost" onClick={()=>setReservas(reservas.filter(r=>r!==a.id))}>Cancelar reserva</Btn>:<Btn full disabled={cheia} onClick={()=>!cheia&&setReservas([...reservas,a.id])}>{cheia?"Entrar na lista de espera":"Reservar vaga"}</Btn>}
-        </Card>;
+        const resKey = diaSel.dateStr+"_"+a.id;
+        const cheia=a.ocupadas>=a.vagas, res=reservas.includes(resKey);
+        const cancelada=(aulasCanceladas||[]).includes(resKey);
+        const pct=a.ocupadas/a.vagas, cor=pct>=1?C.red:pct>=.75?C.accent:C.green;
+        return(
+          <Card key={a.id} highlight={cancelada?C.red:res?C.accent:null}>
+            {cancelada&&<div style={{background:C.red+"18",border:`1px solid ${C.red}33`,borderRadius:8,padding:"7px 12px",marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
+              <Icon name="warn" size={14} color={C.red}/>
+              <span style={{fontSize:11,fontWeight:800,color:C.red}}>Aula cancelada pelo box</span>
+            </div>}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+              <div>
+                <div style={{fontSize:24,fontWeight:900,color:cancelada?C.red:res?C.accent:C.text}}>{a.hora}</div>
+                <div style={{fontSize:15,fontWeight:800,marginTop:1}}>{a.nome}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2}}>Coach {a.coach}</div>
+              </div>
+              {cancelada?<Tag color={C.red}>Cancelada</Tag>
+                :res?<Tag color={C.accent}>✓ Reservado</Tag>
+                :cheia?<Tag color={C.red}>Lotado</Tag>
+                :<Tag color={C.green}>Disponível</Tag>}
+            </div>
+            {!cancelada&&<>
+              <div style={{marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                  <span style={{fontSize:10,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>Vagas</span>
+                  <span style={{fontSize:12,fontWeight:800,color:cor}}>{a.ocupadas}/{a.vagas}</span>
+                </div>
+                <Bar value={a.ocupadas} max={a.vagas} color={cor} thin/>
+              </div>
+              {res
+                ?<Btn full variant="ghost" onClick={()=>setReservas(reservas.filter(r=>r!==resKey))}>Cancelar reserva</Btn>
+                :<Btn full disabled={cheia} onClick={()=>!cheia&&setReservas([...reservas,resKey])}>
+                  {cheia?"Entrar na lista de espera":"Reservar vaga"}
+                </Btn>}
+            </>}
+          </Card>
+        );
       })}
     </div>
   );
 }
 
+/* ════════════════════════════════════════════
+   TELA: PERFIL
+════════════════════════════════════════════ */
 function PerfilScreen({user,username,prs,salvarPRs,onLogout}){
   const checkins=12,meta=15,streak=5,atingiu=checkins>=meta;
-  const[showForm,setShowForm]=useState(false),[novoEx,setNovoEx]=useState(""),[novoPeso,setNovoPeso]=useState(""),[editId,setEditId]=useState(null),[logoutLoading,setLogoutLoading]=useState(false);
-  const nomeFmt=(username||"Aluno").charAt(0).toUpperCase()+(username||"Aluno").slice(1);
+  const [showForm,setShowForm]=useState(false),[novoEx,setNovoEx]=useState(""),[novoPeso,setNovoPeso]=useState(""),[editId,setEditId]=useState(null),[logL,setLogL]=useState(false);
+  const nome=(username||"Aluno").charAt(0).toUpperCase()+(username||"Aluno").slice(1);
   const abrirNovo=()=>{setEditId(null);setNovoEx("");setNovoPeso("");setShowForm(true);};
   const abrirEditar=pr=>{setEditId(pr.id);setNovoEx(pr.exercicio);setNovoPeso(pr.peso);setShowForm(true);};
-  const salvar=()=>{if(!novoEx.trim()||!novoPeso.trim())return;const lista=editId?prs.map(p=>p.id===editId?{...p,exercicio:novoEx.trim(),peso:novoPeso.trim()}:p):[...prs,{id:Date.now(),exercicio:novoEx.trim(),peso:novoPeso.trim()}];salvarPRs(lista);setShowForm(false);setNovoEx("");setNovoPeso("");setEditId(null);};
+  const salvar=()=>{if(!novoEx.trim()||!novoPeso.trim())return;const l=editId?prs.map(p=>p.id===editId?{...p,exercicio:novoEx.trim(),peso:novoPeso.trim()}:p):[...prs,{id:Date.now(),exercicio:novoEx.trim(),peso:novoPeso.trim()}];salvarPRs(l);setShowForm(false);setNovoEx("");setNovoPeso("");setEditId(null);};
   const excluir=id=>salvarPRs(prs.filter(p=>p.id!==id));
-  const handleLogout=async()=>{setLogoutLoading(true);if(sb)await sb.auth.signOut();onLogout();};
+  const handleLogout=async()=>{setLogL(true);if(sb)await sb.auth.signOut();onLogout();};
   const inp={flex:1,background:C.subtle,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px 12px",color:C.text,fontSize:14,fontFamily:"inherit"};
   const hist=[{data:"07/04",aula:"WOD Principal",hora:"18:30",coach:"Thiago"},{data:"05/04",aula:"WOD Matinal",hora:"05:30",coach:"Rafael"},{data:"04/04",aula:"WOD Almoço",hora:"12:00",coach:"Camila"}];
   return(
     <div style={{animation:"fadeIn .4s ease"}}>
       <div style={{textAlign:"center",padding:"10px 0 22px"}}>
-        <div style={{width:80,height:80,borderRadius:"50%",background:`linear-gradient(135deg,${C.accentD},${C.accent})`,margin:"0 auto 12px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,fontWeight:900,color:"#000"}}>{nomeFmt[0]}</div>
-        <div style={{fontSize:22,fontWeight:900}}>{nomeFmt}</div>
+        <div style={{width:80,height:80,borderRadius:"50%",background:`linear-gradient(135deg,${C.accentD},${C.accent})`,margin:"0 auto 12px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,fontWeight:900,color:"#000"}}>{nome[0]}</div>
+        <div style={{fontSize:22,fontWeight:900}}>{nome}</div>
         <div style={{fontSize:12,color:C.muted,marginTop:2}}>@{username}</div>
         <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:10,flexWrap:"wrap"}}>
           <Tag color={C.green}>Ativo</Tag><Tag color={C.accent}>🔥 {streak} dias</Tag>{atingiu&&<Tag color={C.yellow}>🏆 Isento</Tag>}
         </div>
       </div>
       <Card highlight={atingiu?C.green:null}>
-        <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><div><div style={{fontSize:14,fontWeight:800}}>Meta de Check-ins</div><div style={{fontSize:11,color:C.muted,marginTop:2}}>{atingiu?"🏆 Meta atingida!":`Faltam ${meta-checkins} para ficar isento`}</div></div><div style={{fontSize:26,fontWeight:900,color:atingiu?C.green:C.accent}}>{checkins}<span style={{fontSize:14,color:C.muted}}>/{meta}</span></div></div>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+          <div><div style={{fontSize:14,fontWeight:800}}>Meta de Check-ins</div><div style={{fontSize:11,color:C.muted,marginTop:2}}>{atingiu?"🏆 Meta atingida!":`Faltam ${meta-checkins} para ficar isento`}</div></div>
+          <div style={{fontSize:26,fontWeight:900,color:atingiu?C.green:C.accent}}>{checkins}<span style={{fontSize:14,color:C.muted}}>/{meta}</span></div>
+        </div>
         <Bar value={checkins} max={meta} color={atingiu?C.green:C.accent}/>
         {!atingiu&&<div style={{marginTop:10,background:C.subtle,borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:11,fontWeight:700,color:C.muted,lineHeight:1.5}}>💡 Faça 15 check-ins no mês e fique isento de registrar presença nos dias restantes.</div></div>}
       </Card>
@@ -436,13 +747,37 @@ function PerfilScreen({user,username,prs,salvarPRs,onLogout}){
         <Card style={{margin:0,textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:C.accent}}>{checkins}</div><div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1}}>Check-ins</div></Card>
         <Card style={{margin:0,textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:C.green}}>{streak}</div><div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1}}>Dias Seguidos</div></Card>
       </div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase"}}>Recordes Pessoais</div><Btn small onClick={abrirNovo}>+ Novo PR</Btn></div>
-      {showForm&&<Card highlight={C.accent} style={{marginBottom:12}}><div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.accent,textTransform:"uppercase",marginBottom:12}}>{editId?"Editar PR":"Novo PR"}</div><div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}><input value={novoEx} onChange={e=>setNovoEx(e.target.value)} placeholder="Exercício (ex: Snatch...)" style={{...inp,width:"100%",boxSizing:"border-box"}}/><input value={novoPeso} onChange={e=>setNovoPeso(e.target.value)} placeholder="Peso (ex: 95kg, 1:45 min...)" style={{...inp,width:"100%",boxSizing:"border-box"}}/></div><div style={{display:"flex",gap:8}}><Btn full onClick={salvar}>Salvar</Btn><Btn full variant="ghost" onClick={()=>setShowForm(false)}>Cancelar</Btn></div></Card>}
-      {prs.length===0?<Card><div style={{textAlign:"center",padding:"12px 0"}}><div style={{fontSize:24,marginBottom:8}}>🏋️</div><div style={{fontSize:13,color:C.muted,fontWeight:700}}>Nenhum PR ainda</div><div style={{fontSize:11,color:C.muted,marginTop:4}}>Toque em "+ Novo PR" para começar</div></div></Card>
-        :<Card>{prs.map((pr,i)=><div key={pr.id}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}><div style={{fontSize:14,fontWeight:800}}>{pr.exercicio}</div><div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:20,fontWeight:900,color:C.accent}}>{pr.peso}</span><button onClick={()=>abrirEditar(pr)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:10,fontWeight:700,color:C.muted,fontFamily:"inherit"}}>Editar</button><button onClick={()=>excluir(pr.id)} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Icon name="x" size={14} color={C.red}/></button></div></div>{i<prs.length-1&&<Divider/>}</div>)}</Card>}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase"}}>Recordes Pessoais</div>
+        <Btn small onClick={abrirNovo}>+ Novo PR</Btn>
+      </div>
+      {showForm&&<Card highlight={C.accent} style={{marginBottom:12}}>
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.accent,textTransform:"uppercase",marginBottom:12}}>{editId?"Editar PR":"Novo PR"}</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+          <input value={novoEx} onChange={e=>setNovoEx(e.target.value)} placeholder="Exercício (ex: Snatch...)" style={{...inp,width:"100%",boxSizing:"border-box"}}/>
+          <input value={novoPeso} onChange={e=>setNovoPeso(e.target.value)} placeholder="Peso (ex: 95kg, 1:45 min...)" style={{...inp,width:"100%",boxSizing:"border-box"}}/>
+        </div>
+        <div style={{display:"flex",gap:8}}><Btn full onClick={salvar}>Salvar</Btn><Btn full variant="ghost" onClick={()=>setShowForm(false)}>Cancelar</Btn></div>
+      </Card>}
+      {prs.length===0
+        ?<Card><div style={{textAlign:"center",padding:"12px 0"}}><div style={{fontSize:24,marginBottom:8}}>🏋️</div><div style={{fontSize:13,color:C.muted,fontWeight:700}}>Nenhum PR ainda</div><div style={{fontSize:11,color:C.muted,marginTop:4}}>Toque em "+ Novo PR" para começar</div></div></Card>
+        :<Card>{prs.map((pr,i)=><div key={pr.id}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
+          <div style={{fontSize:14,fontWeight:800}}>{pr.exercicio}</div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:20,fontWeight:900,color:C.accent}}>{pr.peso}</span>
+            <button onClick={()=>abrirEditar(pr)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:10,fontWeight:700,color:C.muted,fontFamily:"inherit"}}>Editar</button>
+            <button onClick={()=>excluir(pr.id)} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Icon name="x" size={14} color={C.red}/></button>
+          </div>
+        </div>{i<prs.length-1&&<Divider/>}</div>)}</Card>}
       <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8,marginTop:4}}>Histórico Recente</div>
-      {hist.map((h,i)=><div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:12}}><div style={{width:36,height:36,borderRadius:10,background:C.accent+"22",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="check" size={18} color={C.accent}/></div><div><div style={{fontSize:14,fontWeight:800}}>{h.hora} · {h.aula}</div><div style={{fontSize:11,color:C.muted,marginTop:1}}>Coach {h.coach}</div></div></div><span style={{fontSize:11,fontWeight:700,color:C.muted}}>{h.data}</span></div>)}
-      <div style={{marginTop:8,marginBottom:4}}><Btn full variant="ghost" loading={logoutLoading} onClick={handleLogout}>Sair da conta</Btn></div>
+      {hist.map((h,i)=><div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:36,height:36,borderRadius:10,background:C.accent+"22",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="check" size={18} color={C.accent}/></div>
+          <div><div style={{fontSize:14,fontWeight:800}}>{h.hora} · {h.aula}</div><div style={{fontSize:11,color:C.muted,marginTop:1}}>Coach {h.coach}</div></div>
+        </div>
+        <span style={{fontSize:11,fontWeight:700,color:C.muted}}>{h.data}</span>
+      </div>)}
+      <div style={{marginTop:8,marginBottom:4}}><Btn full variant="ghost" loading={logL} onClick={handleLogout}>Sair da conta</Btn></div>
     </div>
   );
 }
@@ -450,95 +785,88 @@ function PerfilScreen({user,username,prs,salvarPRs,onLogout}){
 /* ════════════════════════════════════════════
    ADMIN PANEL
 ════════════════════════════════════════════ */
+function AdminPanel({onSair,aulasCanceladas,setAulasCanceladas,fdsConfig,setFdsConfig}){
+  const [aba,setAba]         = useState("dashboard");
+  const [pedidos,setPedidos] = useState(ESPERA_INIT);
+  const [expandido,setExpandido] = useState(null);
+  const now = new Date();
+  const [calMes,setCalMes]   = useState(now.getMonth());
+  const [calAno,setCalAno]   = useState(now.getFullYear());
+  const [diaSel,setDiaSel]   = useState(now);
+  // Editor de aulas FDS
+  const [editFDS,setEditFDS] = useState(false);
+  const [fdsLocal,setFdsLocal] = useState(fdsConfig);
+  const [novaHora,setNovaHora]  = useState("");
+  const [novoNome,setNovoNome]  = useState("");
+  const [novoCoach,setNovoCoach]= useState("");
+  const [novasVagas,setNovasVagas]=useState("15");
+  const [fdsDia,setFdsDia]    = useState("sabado"); // sabado | domingo
+  // Cancelar aulas
+  const [mostraAulasCancelar,setMostraAulasCancelar] = useState(false);
+  const [diaCancelIdx,setDiaCancelIdx] = useState(0);
 
-// Mock data admin (substituir por chamadas Supabase via funções RPC)
-const MOCK_PERFIS=[
-  {id:"1",username:"lucasmendes",   plano:"Mensal",   status:"ativo",  vencimento:"2025-04-30"},
-  {id:"2",username:"anapaulasilva", plano:"Trimestral",status:"ativo",  vencimento:"2025-06-15"},
-  {id:"3",username:"carlosrocha",   plano:"Mensal",   status:"inativo",vencimento:"2025-04-01"},
-  {id:"4",username:"fernandalima",  plano:"Mensal",   status:"ativo",  vencimento:"2025-04-22"},
-  {id:"5",username:"marcossouza",   plano:"Anual",    status:"ativo",  vencimento:"2025-12-10"},
-  {id:"6",username:"beatrizcosta",  plano:"Mensal",   status:"ativo",  vencimento:"2025-04-28"},
-];
-
-// Checkins mock por dia e usuário
-const MOCK_CHECKINS_MES={
-  "lucasmendes":12,"anapaulasilva":16,"carlosrocha":4,"fernandalima":15,"marcossouza":9,"beatrizcosta":7
-};
-
-// Gera checkins do dia (mock)
-const gerarCheckinsDia=(data)=>{
-  const seed=data.getDate();
-  const todos=[
-    {username:"lucasmendes",hora:"06:03",aula:"WOD Matinal"},
-    {username:"anapaulasilva",hora:"06:07",aula:"WOD Matinal"},
-    {username:"marcossouza",hora:"06:15",aula:"WOD Matinal"},
-    {username:"fernandalima",hora:"18:02",aula:"WOD Principal"},
-    {username:"beatrizcosta",hora:"18:10",aula:"WOD Principal"},
-    {username:"carlosrocha",hora:"19:31",aula:"Weightlifting"},
-  ];
-  // simula variação por dia
-  return todos.slice(0, Math.max(2, (seed%4)+2));
-};
-
-function AdminPanel({onSair}){
-  const[aba,setAba]=useState("dashboard");
-  const[pedidos,setPedidos]=useState(ESPERA_INIT);
-  const[expandido,setExpandido]=useState(null);
-  const now=new Date();
-  const[calMes,setCalMes]=useState(now.getMonth());
-  const[calAno,setCalAno]=useState(now.getFullYear());
-  const[diaSel,setDiaSel]=useState(now);
-
-  const pendentes=pedidos.filter(p=>p.status==="pendente").length;
-  const ativos=MOCK_PERFIS.filter(p=>p.status==="ativo");
-  const inativos=MOCK_PERFIS.filter(p=>p.status==="inativo");
-
-  // Checkins do mês selecionado (mock — soma fixa por aluno)
-  const checkinsDoMes=Object.entries(MOCK_CHECKINS_MES).map(([username,total])=>({username,total})).sort((a,b)=>b.total-a.total);
-  const atingiram15=checkinsDoMes.filter(c=>c.total>=15);
-
-  // Checkins do dia selecionado
-  const checkinsDia=gerarCheckinsDia(diaSel);
-
-  // Total de checkins do dia
-  const totalCheckinsHoje=checkinsDia.length;
-
-  const MESES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  const pendentes  = pedidos.filter(p=>p.status==="pendente").length;
+  const ativos     = MOCK_PERFIS.filter(p=>p.status==="ativo");
+  const inativos   = MOCK_PERFIS.filter(p=>p.status==="inativo");
+  const checkinsDoMes = Object.entries(MOCK_CHECKINS_MES).map(([u,t])=>({username:u,total:t})).sort((a,b)=>b.total-a.total);
+  const atingiram15 = checkinsDoMes.filter(c=>c.total>=15);
+  const checkinsDia = gerarCheckinsDia(diaSel);
+  const totalHoje   = checkinsDia.length;
 
   const prevMes=()=>{if(calMes===0){setCalMes(11);setCalAno(calAno-1);}else setCalMes(calMes-1);};
   const nextMes=()=>{if(calMes===11){setCalMes(0);setCalAno(calAno+1);}else setCalMes(calMes+1);};
-
-  // Gerador de calendário simples
   const gerarCal=()=>{
-    const primeiroDia=new Date(calAno,calMes,1).getDay();
-    const diasNoMes=new Date(calAno,calMes+1,0).getDate();
-    const cells=[];
-    for(let i=0;i<primeiroDia;i++) cells.push(null);
-    for(let d=1;d<=diasNoMes;d++) cells.push(d);
-    return cells;
+    const p=new Date(calAno,calMes,1).getDay(), n=new Date(calAno,calMes+1,0).getDate(), c=[];
+    for(let i=0;i<p;i++) c.push(null);
+    for(let d=1;d<=n;d++) c.push(d);
+    return c;
   };
 
-  const abas=[
-    {id:"dashboard",label:"Dashboard",icon:"home"},
-    {id:"pedidos",  label:"Pedidos",  icon:"bell",badge:pendentes},
-    {id:"alunos",   label:"Alunos",   icon:"users"},
+  const cards = [
+    {id:"total",   label:"Cadastros",    val:MOCK_PERFIS.length, color:C.accent, icon:"users", lista:MOCK_PERFIS},
+    {id:"ativos",  label:"Ativos",       val:ativos.length,      color:C.green,  icon:"check", lista:ativos},
+    {id:"inativos",label:"Inativos",     val:inativos.length,    color:C.red,    icon:"x",     lista:inativos},
+    {id:"checkins",label:"Check-ins Hoje",val:totalHoje,         color:C.blue,   icon:"fire",  lista:[]},
   ];
 
-  const cards=[
-    {id:"total",   label:"Total Cadastros", val:MOCK_PERFIS.length,  color:C.accent, icon:"users",  lista:MOCK_PERFIS},
-    {id:"ativos",  label:"Ativos",          val:ativos.length,        color:C.green,  icon:"check",  lista:ativos},
-    {id:"inativos",label:"Inativos",        val:inativos.length,      color:C.red,    icon:"x",      lista:inativos},
-    {id:"checkins",label:"Check-ins Hoje",  val:totalCheckinsHoje,    color:C.blue,   icon:"fire",   lista:[]},
+  const abas = [
+    {id:"dashboard",label:"Dashboard",icon:"home"},
+    {id:"aulas",    label:"Aulas FDS", icon:"calendar"},
+    {id:"pedidos",  label:"Pedidos",   icon:"bell",badge:pendentes},
+    {id:"alunos",   label:"Alunos",    icon:"users"},
   ];
+
+  // Adicionar aula no FDS
+  const adicionarAulaFDS = () => {
+    if(!novaHora||!novoNome||!novoCoach) return;
+    const nova = {hora:novaHora,nome:novoNome,coach:novoCoach,vagas:parseInt(novasVagas)||15};
+    const updated = {...fdsLocal, [fdsDia]:[...(fdsLocal[fdsDia]||[]),nova].sort((a,b)=>a.hora.localeCompare(b.hora))};
+    setFdsLocal(updated);
+    setNovaHora("");setNovoNome("");setNovoCoach("");setNovasVagas("15");
+  };
+  const removerAulaFDS = (idx) => {
+    const arr = [...(fdsLocal[fdsDia]||[])];
+    arr.splice(idx,1);
+    setFdsLocal({...fdsLocal,[fdsDia]:arr});
+  };
+  const salvarFDS = () => { setFdsConfig(fdsLocal); setEditFDS(false); };
+
+  // Cancelar aula
+  const diasCancel = getProximosDias();
+  const diaCancelSel = diasCancel[diaCancelIdx];
+  const aulasParaCancelar = getAulasDia(diaCancelSel.tipo, fdsConfig);
+  const toggleCancelar = (key) => {
+    setAulasCanceladas(prev => prev.includes(key)?prev.filter(k=>k!==key):[...prev,key]);
+  };
+
+  const inp = {background:C.subtle,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 12px",color:C.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"};
 
   return(
     <div style={{minHeight:"100vh",background:C.bg,maxWidth:430,margin:"0 auto"}}>
-      <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}} @keyframes spin{to{transform:rotate(360deg)}}`}</style>
       {/* Header */}
-      <div style={{background:"#0D0D0D",borderBottom:`1px solid ${C.border}`,padding:"13px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
+      <div style={{background:"#050505",borderBottom:`1px solid ${C.border}`,padding:"13px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <Logo size={30}/>
+          <Logo size={28}/>
           <div><div style={{fontSize:13,fontWeight:900,color:C.accent,letterSpacing:1,lineHeight:1}}>ADMIN</div><div style={{fontSize:8,fontWeight:700,color:C.muted,letterSpacing:2,lineHeight:1}}>AMAZONAS ALTA PERFORMANCE</div></div>
         </div>
         <button onClick={onSair} style={{background:C.subtle,border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
@@ -552,8 +880,6 @@ function AdminPanel({onSair}){
         {aba==="dashboard"&&(
           <div style={{animation:"fadeIn .4s ease"}}>
             <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:C.muted,textTransform:"uppercase",marginBottom:12}}>Visão Geral</div>
-
-            {/* Cards clicáveis */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
               {cards.map(s=>(
                 <div key={s.id} onClick={()=>s.lista.length>0&&setExpandido(expandido===s.id?null:s.id)}
@@ -566,62 +892,51 @@ function AdminPanel({onSair}){
               ))}
             </div>
 
-            {/* Lista expandida dos cards */}
             {expandido&&cards.find(c=>c.id===expandido)?.lista.length>0&&(
               <div style={{marginBottom:14}}>
                 {cards.find(c=>c.id===expandido).lista.map((p,i)=>{
                   const cor=cards.find(c=>c.id===expandido).color;
-                  return<div key={p.id||i} style={{background:C.card,border:`1px solid ${cor}33`,borderRadius:12,padding:"11px 14px",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  return <div key={p.id||i} style={{background:C.card,border:`1px solid ${cor}33`,borderRadius:12,padding:"11px 14px",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <Avatar nome={p.username||p.nome||"?"} color={cor} size={32}/>
-                      <div><div style={{fontWeight:800,fontSize:13}}>@{p.username||p.nome}</div><div style={{fontSize:10,color:C.muted}}>{p.plano} · {p.status}</div></div>
+                      <Avatar nome={p.username||"?"} color={cor} size={32}/>
+                      <div><div style={{fontWeight:800,fontSize:13}}>@{p.username}</div><div style={{fontSize:10,color:C.muted}}>{p.plano} · {p.status}</div></div>
                     </div>
-                    <Tag color={p.status==="ativo"?C.green:p.status==="inativo"?C.red:cor}>{p.status||"—"}</Tag>
+                    <Tag color={p.status==="ativo"?C.green:C.red}>{p.status}</Tag>
                   </div>;
                 })}
               </div>
             )}
 
-            {/* ── Checkins do dia ── */}
-            <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:10,marginTop:4}}>
-              Check-ins por Dia
-            </div>
-
-            {/* Calendário */}
+            {/* Calendário check-ins */}
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:10,marginTop:4}}>Check-ins por Dia</div>
             <Card>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
                 <button onClick={prevMes} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Icon name="chevronL" size={18} color={C.muted}/></button>
-                <div style={{fontSize:14,fontWeight:800,color:C.text}}>{MESES[calMes]} {calAno}</div>
+                <div style={{fontSize:14,fontWeight:800}}>{MESES[calMes]} {calAno}</div>
                 <button onClick={nextMes} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Icon name="chevronR" size={18} color={C.muted}/></button>
               </div>
-              {/* Cabeçalho dias da semana */}
               <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:4}}>
-                {["D","S","T","Q","Q","S","S"].map((d,i)=><div key={i} style={{textAlign:"center",fontSize:9,fontWeight:700,color:C.muted,padding:"2px 0"}}>{d}</div>)}
+                {["D","S","T","Q","Q","S","S"].map((d,i)=><div key={i} style={{textAlign:"center",fontSize:9,fontWeight:700,color:C.muted}}>{d}</div>)}
               </div>
-              {/* Células do calendário */}
               <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}}>
                 {gerarCal().map((d,i)=>{
                   if(!d)return<div key={i}/>;
-                  const dataCel=new Date(calAno,calMes,d);
-                  const isHoje=dataCel.toDateString()===now.toDateString();
-                  const isSel=dataCel.toDateString()===diaSel.toDateString();
-                  const ckDia=gerarCheckinsDia(dataCel).length;
-                  const temCheckin=ckDia>0;
-                  return<button key={i} onClick={()=>setDiaSel(dataCel)} style={{aspectRatio:"1",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"inherit",position:"relative",
-                    background:isSel?C.accent:isHoje?C.accentD+"44":temCheckin?C.green+"18":C.subtle,
-                    color:isSel?"#000":isHoje?C.accent:C.text,
-                    fontWeight:isSel||isHoje?900:600,fontSize:11,
-                    outline:isSel?`2px solid ${C.accent}`:"none"}}>
+                  const cel=new Date(calAno,calMes,d);
+                  const isHoje=cel.toDateString()===now.toDateString();
+                  const isSel=cel.toDateString()===diaSel.toDateString();
+                  const ck=gerarCheckinsDia(cel).length;
+                  return<button key={i} onClick={()=>setDiaSel(cel)} style={{aspectRatio:"1",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"inherit",position:"relative",
+                    background:isSel?C.accent:isHoje?C.accentD+"44":ck>0?C.green+"18":C.subtle,
+                    color:isSel?"#000":isHoje?C.accent:C.text,fontWeight:isSel||isHoje?900:600,fontSize:11}}>
                     {d}
-                    {temCheckin&&!isSel&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:4,height:4,borderRadius:"50%",background:isSel?"#000":C.green}}/>}
+                    {ck>0&&!isSel&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",width:4,height:4,borderRadius:"50%",background:C.green}}/>}
                   </button>;
                 })}
               </div>
             </Card>
 
-            {/* Lista de checkins do dia selecionado */}
             <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8}}>
-              Check-ins — {diaSel.toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"})} ({checkinsDia.length})
+              Check-ins — {diaSel.toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})} ({checkinsDia.length})
             </div>
             {checkinsDia.length===0
               ?<Card><div style={{fontSize:13,color:C.muted,textAlign:"center",padding:"8px 0"}}>Nenhum check-in neste dia</div></Card>
@@ -633,15 +948,12 @@ function AdminPanel({onSair}){
                 <Tag color={C.green}>{c.hora}</Tag>
               </div>)}
 
-            {/* ── Isentos do mês ── */}
+            {/* Isentos do mês */}
             <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8,marginTop:4}}>
               🏆 Isentos — {MESES[calMes]}
             </div>
-            <div style={{fontSize:12,color:C.muted,marginBottom:10}}>
-              Alunos que atingiram 15 check-ins e estão isentos pelo resto do mês
-            </div>
             {atingiram15.length===0
-              ?<Card><div style={{fontSize:13,color:C.muted,textAlign:"center",padding:"8px 0"}}>Nenhum aluno atingiu 15 check-ins ainda neste mês</div></Card>
+              ?<Card><div style={{fontSize:13,color:C.muted,textAlign:"center",padding:"8px 0"}}>Nenhum aluno atingiu 15 check-ins ainda</div></Card>
               :atingiram15.map((c,i)=><div key={i} style={{background:C.green+"0F",border:`1px solid ${C.green}33`,borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <Avatar nome={c.username} color={C.green}/>
@@ -653,12 +965,11 @@ function AdminPanel({onSair}){
                 </div>
               </div>)}
 
-            {/* Todos os check-ins do mês */}
+            {/* Todos check-ins do mês */}
             <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8,marginTop:4}}>
-              Todos — {MESES[calMes]}
+              Ranking — {MESES[calMes]}
             </div>
             {checkinsDoMes.map((c,i)=>{
-              const pct=Math.min(c.total/15,1);
               const cor=c.total>=15?C.green:c.total>=10?C.accent:C.muted;
               return<div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
@@ -671,6 +982,104 @@ function AdminPanel({onSair}){
                 <Bar value={c.total} max={15} color={cor} thin/>
               </div>;
             })}
+          </div>
+        )}
+
+        {/* ── AULAS FIM DE SEMANA ── */}
+        {aba==="aulas"&&(
+          <div style={{animation:"fadeIn .4s ease"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+              <div style={{fontSize:20,fontWeight:900,letterSpacing:1}}>AULAS FIM DE SEMANA</div>
+            </div>
+            <p style={{fontSize:12,color:C.muted,marginBottom:16}}>Edite horários de sábado e domingo, e cancele aulas</p>
+
+            {/* Cancelar aulas */}
+            <div style={{background:C.red+"12",border:`1px solid ${C.red}33`,borderRadius:14,padding:16,marginBottom:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:mostraAulasCancelar?14:0}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:800,color:C.red}}>⚠️ Cancelar Aula</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:2}}>Alunos serão notificados</div>
+                </div>
+                <Btn small variant="danger" onClick={()=>setMostraAulasCancelar(!mostraAulasCancelar)}>
+                  {mostraAulasCancelar?"Fechar":"Gerenciar"}
+                </Btn>
+              </div>
+              {mostraAulasCancelar&&<>
+                <div style={{display:"flex",gap:6,marginBottom:12,overflowX:"auto",paddingBottom:4}}>
+                  {diasCancel.map((d,i)=><button key={i} onClick={()=>setDiaCancelIdx(i)} style={{background:i===diaCancelIdx?C.red:C.subtle,color:i===diaCancelIdx?"#fff":C.muted,border:"none",borderRadius:8,padding:"6px 12px",fontWeight:800,fontSize:10,cursor:"pointer",fontFamily:"inherit",textTransform:"uppercase",whiteSpace:"nowrap",flexShrink:0}}>{d.label}</button>)}
+                </div>
+                {aulasParaCancelar.map(a=>{
+                  const key=diaCancelSel.dateStr+"_"+a.id;
+                  const isCancelada=(aulasCanceladas||[]).includes(key);
+                  return<div key={a.id} style={{background:isCancelada?C.red+"18":C.subtle,border:`1px solid ${isCancelada?C.red+"55":C.border}`,borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <div>
+                      <div style={{fontWeight:800,fontSize:13,color:isCancelada?C.red:C.text}}>{a.hora} · {a.nome}</div>
+                      <div style={{fontSize:11,color:C.muted,marginTop:2}}>Coach {a.coach}</div>
+                    </div>
+                    <button onClick={()=>toggleCancelar(key)} style={{background:isCancelada?C.green+"22":C.red+"22",border:`1px solid ${isCancelada?C.green+"44":C.red+"44"}`,borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:11,fontWeight:800,color:isCancelada?C.green:C.red,fontFamily:"inherit",whiteSpace:"nowrap"}}>
+                      {isCancelada?"✓ Restaurar":"✗ Cancelar"}
+                    </button>
+                  </div>;
+                })}
+              </>}
+            </div>
+
+            {/* Editor aulas FDS */}
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:editFDS?14:0}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:800}}>🗓️ Horários Sáb / Dom</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:2}}>Configure aulas do fim de semana</div>
+                </div>
+                <Btn small onClick={()=>{setFdsLocal(fdsConfig);setEditFDS(!editFDS);}}>
+                  {editFDS?"Cancelar":"Editar"}
+                </Btn>
+              </div>
+
+              {editFDS&&<>
+                {/* Tabs sab/dom */}
+                <div style={{display:"flex",gap:6,marginBottom:14}}>
+                  {[["sabado","Sábado"],["domingo","Domingo"]].map(([d,l])=>(
+                    <button key={d} onClick={()=>setFdsDia(d)} style={{flex:1,background:fdsDia===d?C.accent:C.subtle,color:fdsDia===d?"#000":C.muted,border:"none",borderRadius:10,padding:"8px",fontWeight:800,fontSize:12,letterSpacing:1,cursor:"pointer",fontFamily:"inherit",textTransform:"uppercase"}}>{l}</button>
+                  ))}
+                </div>
+
+                {/* Lista atual */}
+                {(fdsLocal[fdsDia]||[]).map((a,i)=>(
+                  <div key={i} style={{background:C.subtle,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <div>
+                      <div style={{fontWeight:800,fontSize:13}}>{a.hora} · {a.nome}</div>
+                      <div style={{fontSize:11,color:C.muted}}>Coach {a.coach} · {a.vagas} vagas</div>
+                    </div>
+                    <button onClick={()=>removerAulaFDS(i)} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Icon name="trash" size={16} color={C.red}/></button>
+                  </div>
+                ))}
+
+                {/* Form nova aula */}
+                <div style={{background:C.subtle,borderRadius:12,padding:14,marginTop:8,marginBottom:12}}>
+                  <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:10}}>+ Nova aula</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                    <input value={novaHora} onChange={e=>setNovaHora(e.target.value)} placeholder="Horário (09:00)" style={inp}/>
+                    <input value={novasVagas} onChange={e=>setNovasVagas(e.target.value)} placeholder="Vagas (15)" style={inp} type="number"/>
+                  </div>
+                  <div style={{marginBottom:8}}><input value={novoNome} onChange={e=>setNovoNome(e.target.value)} placeholder="Nome da aula" style={inp}/></div>
+                  <div style={{marginBottom:12}}><input value={novoCoach} onChange={e=>setNovoCoach(e.target.value)} placeholder="Coach" style={inp}/></div>
+                  <Btn full small variant="ghost" onClick={adicionarAulaFDS}>Adicionar aula</Btn>
+                </div>
+
+                <Btn full onClick={salvarFDS}>💾 Salvar alterações</Btn>
+              </>}
+
+              {!editFDS&&(
+                <div style={{marginTop:14}}>
+                  {["sabado","domingo"].map(dia=><div key={dia} style={{marginBottom:10}}>
+                    <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{dia==="sabado"?"Sábado":"Domingo"}</div>
+                    {(fdsConfig[dia]||[]).map((a,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"3px 0"}}>{a.hora} — {a.nome} (Coach {a.coach})</div>)}
+                    {!(fdsConfig[dia]||[]).length&&<div style={{fontSize:11,color:C.muted}}>Nenhuma aula cadastrada</div>}
+                  </div>)}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -689,10 +1098,12 @@ function AdminPanel({onSair}){
                   </div>
                   <Tag color={cor}>{p.tipo==="experimental"?"Experimental":"Espera"}</Tag>
                 </div>
-                {p.status==="pendente"?<div style={{display:"flex",gap:8}}>
-                  <Btn full variant="green" small onClick={()=>setPedidos(pedidos.map(x=>x.id===p.id?{...x,status:"aceito"}:x))}>✓ Aceitar</Btn>
-                  <Btn full variant="danger" small onClick={()=>setPedidos(pedidos.map(x=>x.id===p.id?{...x,status:"recusado"}:x))}>✗ Recusar</Btn>
-                </div>:<div style={{textAlign:"center"}}><Tag color={p.status==="aceito"?C.green:C.red}>{p.status==="aceito"?"✓ Aceito":"✗ Recusado"}</Tag></div>}
+                {p.status==="pendente"
+                  ?<div style={{display:"flex",gap:8}}>
+                    <Btn full variant="green" small onClick={()=>setPedidos(pedidos.map(x=>x.id===p.id?{...x,status:"aceito"}:x))}>✓ Aceitar</Btn>
+                    <Btn full variant="danger" small onClick={()=>setPedidos(pedidos.map(x=>x.id===p.id?{...x,status:"recusado"}:x))}>✗ Recusar</Btn>
+                  </div>
+                  :<div style={{textAlign:"center"}}><Tag color={p.status==="aceito"?C.green:C.red}>{p.status==="aceito"?"✓ Aceito":"✗ Recusado"}</Tag></div>}
               </Card>;
             })}
           </div>
@@ -728,12 +1139,12 @@ function AdminPanel({onSair}){
         )}
       </div>
 
-      {/* Bottom nav admin */}
-      <div style={{display:"flex",background:"#0D0D0D",borderTop:`1px solid ${C.border}`,position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,zIndex:100}}>
+      {/* Bottom nav */}
+      <div style={{display:"flex",background:"#050505",borderTop:`1px solid ${C.border}`,position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,zIndex:100}}>
         {abas.map(t=>{const active=aba===t.id;return<button key={t.id} onClick={()=>setAba(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 0 14px",background:"none",border:"none",borderTop:active?`2px solid ${C.accent}`:"2px solid transparent",cursor:"pointer",position:"relative"}}>
-          <Icon name={t.icon} size={20} color={active?C.accent:C.muted}/>
-          {t.badge>0&&<div style={{position:"absolute",top:6,right:"50%",marginRight:-18,width:16,height:16,borderRadius:"50%",background:C.red,fontSize:9,fontWeight:900,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>{t.badge}</div>}
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:1,marginTop:4,color:active?C.accent:C.muted,textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif"}}>{t.label}</span>
+          <Icon name={t.icon} size={18} color={active?C.accent:C.muted}/>
+          {t.badge>0&&<div style={{position:"absolute",top:6,right:"50%",marginRight:-14,width:15,height:15,borderRadius:"50%",background:C.red,fontSize:9,fontWeight:900,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>{t.badge}</div>}
+          <span style={{fontSize:8,fontWeight:700,letterSpacing:.5,marginTop:3,color:active?C.accent:C.muted,textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif"}}>{t.label}</span>
         </button>;})}
       </div>
     </div>
@@ -744,33 +1155,36 @@ function AdminPanel({onSair}){
    APP ROOT
 ════════════════════════════════════════════ */
 function App(){
-  const[user,setUser]=useState(null),[username,setUsername]=useState("");
-  const[authLoading,setAuthLoading]=useState(true);
-  const[adminMode,setAdminMode]=useState(false);
-  const[tab,setTab]=useState("home"),[reservas,setReservas]=useState([]);
-  const[showInstall,setShowInstall]=useState(false),[notifPerm,setNotifPerm]=useState("default");
-  const[banner,setBanner]=useState(null),[prs,setPrs]=useState(PR_DEF);
-  const timerRef=useRef(null);
+  const [user,setUser]       = useState(null),[username,setUsername]=useState("");
+  const [authLoading,setAuthLoading] = useState(true);
+  const [adminMode,setAdminMode]     = useState(false);
+  const [tab,setTab]         = useState("home"),[reservas,setReservas]=useState([]);
+  const [showInstall,setShowInstall] = useState(false),[notifPerm,setNotifPerm]=useState("default");
+  const [banner,setBanner]   = useState(null),[prs,setPrs]=useState(PR_DEF);
+  // Estado compartilhado: aulas canceladas e config FDS
+  const [aulasCanceladas,setAulasCanceladas] = useState(()=>JSON.parse(LS.get("aulasCanceladas")?.value||"[]"));
+  const [fdsConfig,setFdsConfig] = useState(()=>JSON.parse(LS.get("fdsConfig")?.value||"null")||AULAS_FDS_DEFAULT);
+  const timerRef = useRef(null);
+
+  // Persiste cancelamentos e fds
+  useEffect(()=>{ LS.set("aulasCanceladas",JSON.stringify(aulasCanceladas)); },[aulasCanceladas]);
+  useEffect(()=>{ LS.set("fdsConfig",JSON.stringify(fdsConfig)); },[fdsConfig]);
 
   useEffect(()=>{
-    if(!SUPABASE_OK||!sb){setAuthLoading(false);return;}
+    if(!SUPABASE_OK||!sb){ setAuthLoading(false); return; }
     sb.auth.getSession().then(({data:{session}})=>{
       if(session?.user){
         setUser(session.user);
-        const uname=session.user.user_metadata?.username||session.user.email?.split("@")[0]||"aluno";
-        setUsername(uname);
+        setUsername(session.user.user_metadata?.username||session.user.email?.split("@")[0]||"aluno");
       }
       setAuthLoading(false);
     });
-    const{data:{subscription}}=sb.auth.onAuthStateChange((_,session)=>{
+    const {data:{subscription}} = sb.auth.onAuthStateChange((_,session)=>{
       setUser(session?.user||null);
-      if(session?.user){
-        const uname=session.user.user_metadata?.username||session.user.email?.split("@")[0]||"aluno";
-        setUsername(uname);
-      }
+      if(session?.user) setUsername(session.user.user_metadata?.username||session.user.email?.split("@")[0]||"aluno");
     });
     window.addEventListener("beforeinstallprompt",e=>e.preventDefault());
-    return()=>subscription.unsubscribe();
+    return ()=>subscription.unsubscribe();
   },[]);
 
   useEffect(()=>{
@@ -779,58 +1193,74 @@ function App(){
     const p=LS.get("install-never-show");if(!p)setShowInstall(true);
   },[user]);
 
+  // Banner lembrete para reservas (busca em qualquer dia)
   useEffect(()=>{
-    const res=AULAS.find(a=>reservas.includes(a.id));
-    if(!res){setBanner(null);return;}
-    if(timerRef.current)clearTimeout(timerRef.current);
-    timerRef.current=setTimeout(()=>setBanner(res),4000);
-    return()=>clearTimeout(timerRef.current);
-  },[reservas]);
+    if(reservas.length===0){setBanner(null);return;}
+    if(timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(()=>{
+      const dias=getProximosDias();
+      for(const dia of dias){
+        const aulas=getAulasDia(dia.tipo,fdsConfig);
+        const res=aulas.find(a=>reservas.includes(dia.dateStr+"_"+a.id));
+        if(res){setBanner({...res,label:dia.label});return;}
+      }
+    },4000);
+    return ()=>clearTimeout(timerRef.current);
+  },[reservas,fdsConfig]);
 
-  const salvarPRs=lista=>{setPrs(lista);if(user)LS.set(`prs_${user.id}`,JSON.stringify(lista));};
-  const fecharInstall=()=>setShowInstall(false);
-  const nuncaMostrar=()=>{setShowInstall(false);LS.set("install-never-show","1");};
-  const ativarNotif=async()=>{
+  const salvarPRs = lista=>{setPrs(lista);if(user)LS.set(`prs_${user.id}`,JSON.stringify(lista));};
+  const fecharInstall = ()=>setShowInstall(false);
+  const nuncaMostrar  = ()=>{setShowInstall(false);LS.set("install-never-show","1");};
+  const ativarNotif   = async()=>{
     if(!("Notification"in window)){alert("Adicione o app à tela inicial para ativar notificações.");return;}
     const p=await Notification.requestPermission();setNotifPerm(p);
-    if(p==="granted")new Notification("Amazonas Alta Performance 🔥",{body:"Notificações ativadas!",icon:"/logoamazonas.png"});
+    if(p==="granted") new Notification("Amazonas Alta Performance 🔥",{body:"Notificações ativadas!",icon:"/logoamazonas.png"});
   };
 
-  if(authLoading)return(
+  if(authLoading) return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:20}}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <Logo size={60}/>
-      <div style={{width:32,height:32,border:`3px solid ${C.border}`,borderTopColor:C.accent,borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+      <div style={{width:30,height:30,border:`3px solid ${C.border}`,borderTopColor:C.accent,borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
     </div>
   );
 
-  if(adminMode)return<AdminPanel onSair={()=>setAdminMode(false)}/>;
-
-  if(!user)return<LoginScreen
-    onLogin={(u,uname)=>{setUser(u);setUsername(uname||u.user_metadata?.username||u.email?.split("@")[0]||"aluno");}}
-    onAdmin={()=>setAdminMode(true)}/>;
+  if(adminMode) return <AdminPanel onSair={()=>setAdminMode(false)} aulasCanceladas={aulasCanceladas} setAulasCanceladas={setAulasCanceladas} fdsConfig={fdsConfig} setFdsConfig={setFdsConfig}/>;
+  if(!user)     return <LoginScreen onLogin={(u,uname)=>{setUser(u);setUsername(uname||u.user_metadata?.username||u.email?.split("@")[0]||"aluno");}} onAdmin={()=>setAdminMode(true)}/>;
 
   const navTabs=[{id:"home",label:"Início",icon:"home"},{id:"aulas",label:"Aulas",icon:"calendar"},{id:"perfil",label:"Perfil",icon:"person"}];
   const screens={
-    home:<HomeScreen username={username} reservas={reservas} setReservas={setReservas} setTab={setTab} notifPerm={notifPerm} onAtivarNotif={ativarNotif} prs={prs}/>,
-    aulas:<AulasScreen reservas={reservas} setReservas={setReservas}/>,
-    perfil:<PerfilScreen user={user} username={username} prs={prs} salvarPRs={salvarPRs} onLogout={()=>{setUser(null);setUsername("");setTab("home");}}/>,
+    home:   <HomeScreen username={username} reservas={reservas} setReservas={setReservas} setTab={setTab} notifPerm={notifPerm} onAtivarNotif={ativarNotif} prs={prs} fdsConfig={fdsConfig}/>,
+    aulas:  <AulasScreen reservas={reservas} setReservas={setReservas} aulasCanceladas={aulasCanceladas} fdsConfig={fdsConfig}/>,
+    perfil: <PerfilScreen user={user} username={username} prs={prs} salvarPRs={salvarPRs} onLogout={()=>{setUser(null);setUsername("");setTab("home");}}/>,
   };
 
   return(
     <div style={{fontFamily:"'Barlow Condensed',Impact,sans-serif",background:C.bg,color:C.text,minHeight:"100vh",maxWidth:430,margin:"0 auto",position:"relative"}}>
       <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}} @keyframes spin{to{transform:rotate(360deg)}} @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+
       {banner&&<NotifBanner aula={banner} onDismiss={()=>setBanner(null)}/>}
+
+      {/* Header */}
       <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"13px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <Logo size={32}/>
-          <div><div style={{fontSize:14,fontWeight:900,color:C.accent,letterSpacing:2,lineHeight:1}}>AMAZONAS</div><div style={{fontSize:8,fontWeight:700,color:C.muted,letterSpacing:2,lineHeight:1}}>ALTA PERFORMANCE</div></div>
+          <Logo size={30}/>
+          <div>
+            <div style={{fontSize:13,fontWeight:900,color:C.accent,letterSpacing:2,lineHeight:1}}>AMAZONAS</div>
+            <div style={{fontSize:8,fontWeight:700,color:C.muted,letterSpacing:2,lineHeight:1}}>ALTA PERFORMANCE</div>
+          </div>
         </div>
       </div>
+
       <div style={{padding:"16px 16px 90px"}}>{screens[tab]}</div>
+
+      {/* Nav */}
       <div style={{display:"flex",background:C.surface,borderTop:`1px solid ${C.border}`,position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,zIndex:100}}>
-        {navTabs.map(t=>{const active=tab===t.id;return<button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 0 14px",background:"none",border:"none",borderTop:active?`2px solid ${C.accent}`:"2px solid transparent",cursor:"pointer"}}><Icon name={t.icon} size={20} color={active?C.accent:C.muted}/><span style={{fontSize:9,fontWeight:700,letterSpacing:1,marginTop:4,color:active?C.accent:C.muted,textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif"}}>{t.label}</span></button>;})}
+        {navTabs.map(t=>{const active=tab===t.id;return<button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 0 14px",background:"none",border:"none",borderTop:active?`2px solid ${C.accent}`:"2px solid transparent",cursor:"pointer"}}>
+          <Icon name={t.icon} size={20} color={active?C.accent:C.muted}/>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1,marginTop:4,color:active?C.accent:C.muted,textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif"}}>{t.label}</span>
+        </button>;})}
       </div>
+
       {showInstall&&<InstallPopup onClose={fecharInstall} onNever={nuncaMostrar}/>}
     </div>
   );
