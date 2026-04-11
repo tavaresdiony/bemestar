@@ -1,1156 +1,497 @@
-import { useState, useEffect, useRef } from “react”;
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#080808"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Amazonas"/>
+  <meta name="description" content="App oficial da Amazonas Alta Performance"/>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="icon" href="/favicon-512x512.png"/>
+  <link rel="apple-touch-icon" href="/favicon-512x512.png"/>
+  <title>Amazonas Alta Performance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body{height:100%;background:#080808;}
+    body{font-family:'Barlow Condensed',Impact,sans-serif;color:#F0F0F0;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+    #root{max-width:430px;margin:0 auto;min-height:100vh;position:relative;}
+    ::-webkit-scrollbar{width:3px;}
+    ::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:4px;}
+    input::placeholder{color:#444;}
+    input,button,textarea{font-family:'Barlow Condensed',Impact,sans-serif;}
+    button{-webkit-tap-highlight-color:transparent;outline:none;}
+    input{outline:none;}
+    @keyframes splashLogoIn{0%{transform:scale(0.5) rotate(-10deg);opacity:0}65%{transform:scale(1.1) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:1}}
+    @keyframes splashTextIn{0%{opacity:0;transform:translateY(18px)}100%{opacity:1;transform:translateY(0)}}
+    @keyframes splashBarFill{0%{width:0%}100%{width:100%}}
+    @keyframes splashFadeOut{0%{opacity:1;visibility:visible}100%{opacity:0;visibility:hidden}}
+    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #splash{position:fixed;inset:0;z-index:9999;background:#080808;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+    #splash.hide{animation:splashFadeOut .5s ease .1s forwards;}
+    #splash-logo{width:180px;margin-bottom:28px;animation:splashLogoIn .8s cubic-bezier(.34,1.56,.64,1) both;}
+    #splash-sub{font-size:11px;font-weight:700;letter-spacing:5px;color:#444;text-transform:uppercase;margin-bottom:48px;animation:splashTextIn .5s ease .5s both;}
+    #splash-track{width:140px;height:3px;background:#1a1a1a;border-radius:3px;overflow:hidden;animation:splashTextIn .3s ease .6s both;}
+    #splash-bar{height:100%;background:linear-gradient(90deg,#CC5200,#FF6A00);border-radius:3px;animation:splashBarFill 1.3s ease .7s both;}
+  </style>
+</head>
+<body>
+<div id="splash">
+  <img id="splash-logo" src="/favicon-512x512.png" alt="Amazonas"/>
+  <div id="splash-sub">Alta Performance</div>
+  <div id="splash-track"><div id="splash-bar"></div></div>
+</div>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  setTimeout(function(){
+    var s=document.getElementById('splash');
+    if(s){s.classList.add('hide');setTimeout(function(){s.remove();},600);}
+  },2200);
+</script>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
 
-/* ─── TOKENS ─────────────────────────────────────────────────── */
-const C = {
-bg:”#080808”, surface:”#111”, card:”#161616”, border:”#202020”,
-accent:”#FF6A00”, accentD:”#CC5200”, accentL:”#FF8C33”,
-green:”#22C55E”, red:”#EF4444”, blue:”#3B82F6”, yellow:”#F59E0B”,
-text:”#F0F0F0”, muted:”#555”, subtle:”#1A1A1A”,
+/* ════════════════════════════════════════════════════
+   ⚙️  SUPABASE — cole sua URL e chave anon abaixo
+   Painel Supabase → Settings → API
+════════════════════════════════════════════════════ */
+const SUPABASE_URL  = "https://rdyxsxrqaragffgdcqkg.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkeXhzeHJxYXJhZ2ZmZ2RjcWtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzNDA0NzYsImV4cCI6MjA5MDkxNjQ3Nn0.9IF5IN1ym_03USDjeuV4uQRL1oVCRyoHX_L6iySq1l0";
+const sb = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+/* ── storage helper ──────────────────────────────── */
+const LS = {
+  get:(k)=>{ try{ const v=localStorage.getItem(k); return v?{value:v}:null; }catch(e){return null;} },
+  set:(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} },
 };
 
-/* ─── HORÁRIOS ───────────────────────────────────────────────── */
-const HORARIOS_SEMANA = [“05:30”,“06:30”,“07:30”,“12:00”,“16:30”,“17:30”,“18:30”,“19:30”,“20:30”];
-const HORARIOS_SEXTA  = [“05:30”,“06:30”,“07:30”,“12:00”,“16:30”,“17:30”,“18:30”,“19:30”];
-const DIAS = [“Seg”,“Ter”,“Qua”,“Qui”,“Sex”];
+/* ── Design tokens ───────────────────────────────── */
+const C={bg:"#080808",surface:"#111",card:"#161616",border:"#202020",accent:"#FF6A00",accentD:"#CC5200",green:"#22C55E",red:"#EF4444",blue:"#3B82F6",yellow:"#F59E0B",text:"#F0F0F0",muted:"#555",subtle:"#1A1A1A"};
 
-const getDiaSemana = () => {
-const d = new Date().getDay();
-if(d===0||d===6) return null;
-if(d===5) return “Sex”;
-return DIAS[d-1];
+/* ── Horários ────────────────────────────────────── */
+const H_SEM=["05:30","06:30","07:30","12:00","16:30","17:30","18:30","19:30","20:30"];
+const H_SEX=["05:30","06:30","07:30","12:00","16:30","17:30","18:30","19:30"];
+const DIAS=["Seg","Ter","Qua","Qui","Sex"];
+const getDia=()=>{const d=new Date().getDay();if(d===0||d===6)return null;if(d===5)return"Sex";return DIAS[d-1];};
+const getH=(dia)=>dia==="Sex"?H_SEX:H_SEM;
+
+/* ── Mock data ───────────────────────────────────── */
+const PERFIL={plano:"Mensal",venc:"30/04/2025",checkins:12,meta:15,streak:5};
+const PR_DEF=[{id:1,exercicio:"Agachamento",peso:"120kg"},{id:2,exercicio:"Levantamento Terra",peso:"150kg"},{id:3,exercicio:"Clean",peso:"80kg"}];
+const AULAS=(()=>{const hoje=getDia()||"Seg";return getH(hoje).map((h,i)=>({id:i+1,hora:h,nome:h<"10:00"?"WOD Matinal":h==="12:00"?"WOD Almoço":"WOD Principal",coach:["Rafael","Camila","Thiago"][i%3],vagas:15,ocupadas:[3,8,12,5,7,10,13,6,4][i]||5}));})();
+const ADMIN_ALUNOS=[{id:1,nome:"Lucas Mendes",plano:"Mensal",status:"ativo",venc:"30/04",checkins:12},{id:2,nome:"Ana Paula Silva",plano:"Trimestral",status:"ativo",venc:"15/06",checkins:16},{id:3,nome:"Carlos Rocha",plano:"Mensal",status:"vencido",venc:"01/04",checkins:4},{id:4,nome:"Fernanda Lima",plano:"Mensal",status:"ativo",venc:"22/04",checkins:15},{id:5,nome:"Marcos Souza",plano:"Anual",status:"ativo",venc:"10/12",checkins:9},{id:6,nome:"Beatriz Costa",plano:"Mensal",status:"ativo",venc:"28/04",checkins:7}];
+const ESPERA_INIT=[{id:1,nome:"Pedro Alves",aula:"WOD Principal 18:30",tipo:"espera",status:"pendente",hora:"14:22"},{id:2,nome:"Juliana Matos",aula:"Aula Experimental",tipo:"experimental",status:"pendente",hora:"13:05"},{id:3,nome:"Ricardo Lima",aula:"WOD Matinal 05:30",tipo:"espera",status:"pendente",hora:"11:47"},{id:4,nome:"Camila Torres",aula:"Aula Experimental",tipo:"experimental",status:"pendente",hora:"10:30"}];
+
+/* ── Icons ───────────────────────────────────────── */
+const PATHS={home:"M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.6 5.4 21 6 21H9M19 10L21 12M19 10V20C19 20.6 18.6 21 18 21H15M9 21C9 21 9 15 12 15C15 15 15 21 15 21M9 21H15",calendar:"M8 2V6M16 2V6M3 10H21M5 4H19C20.1 4 21 4.9 21 6V20C21 21.1 20.1 22 19 22H5C3.9 22 3 21.1 3 20V6C3 4.9 3.9 4 5 4Z",person:"M20 21V19C20 16.8 18.2 15 16 15H8C5.8 15 4 16.8 4 19V21M12 11C14.2 11 16 9.2 16 7C16 4.8 14.2 3 12 3C9.8 3 8 4.8 8 7C8 9.2 9.8 11 12 11Z",bell:"M18 8A6 6 0 006 8C6 15 3 17 3 17H21S18 15 18 8ZM13.73 21A2 2 0 0110.27 21",check:"M9 12L11 14L15 10M21 12C21 16.97 16.97 21 12 21C7.03 21 3 16.97 3 12C3 7.03 7.03 3 12 3C16.97 3 21 7.03 21 12Z",fire:"M12 2C6 8 6 13 9 16C9 13 11 11 12 10C12 13 14 15 14 17C17 15 18 11 15 7C15 10 13 11 12 13C11 11 13 7 12 2Z",users:"M17 21V19C17 16.8 15.2 15 13 15H5C2.8 15 1 16.8 1 19V21M23 21V19C23 17.1 21.7 15.5 20 15.1M16 3.1C17.7 3.5 19 5.1 19 7S17.7 10.5 16 10.9M13 7C13 9.2 11.2 11 9 11C6.8 11 5 9.2 5 7S6.8 3 9 3S13 4.8 13 7Z",x:"M18 6L6 18M6 6L18 18",lock:"M19 11H5C3.9 11 3 11.9 3 13V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V13C21 11.9 20.1 11 19 11ZM12 17C11.4 17 11 16.6 11 16S11.4 15 12 15S13 15.4 13 16S12.6 17 12 17ZM17 11V7C17 4.2 14.8 2 12 2S7 4.2 7 7V11",arrow:"M19 12H5M12 5L5 12L12 19",star:"M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z",eye:"M1 12S5 4 12 4 23 12 23 12 19 20 12 20 1 12 1 12ZM12 15C13.66 15 15 13.66 15 12S13.66 9 12 9 9 10.34 9 12 10.34 15 12 15Z",eyeOff:"M17.94 17.94A10.07 10.07 0 0112 20C5 20 1 12 1 12A18.09 18.09 0 015.06 5.06M9.9 4.24A9.12 9.12 0 0112 4C19 4 23 12 23 12A18.09 18.09 0 0118.94 18.94M1 1L23 23"};
+const Icon=({name,size=22,color=C.muted})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={PATHS[name]||""}/></svg>;
+
+/* ── Atoms ───────────────────────────────────────── */
+const Tag=({children,color})=><span style={{background:color+"20",color,border:`1px solid ${color}40`,borderRadius:6,fontSize:10,fontWeight:700,letterSpacing:1,padding:"2px 8px",textTransform:"uppercase"}}>{children}</span>;
+
+const Btn=({children,onClick,variant="primary",small,full,disabled,loading})=>{
+  const bg={primary:C.accent,danger:C.red,green:C.green,ghost:C.subtle}[variant]||C.subtle;
+  const fg=(variant==="primary"||variant==="green")?"#000":"#fff";
+  const off=disabled||loading;
+  return <button onClick={onClick} disabled={off} style={{background:off?C.subtle:bg,color:off?C.muted:fg,border:"none",borderRadius:10,padding:small?"7px 14px":"12px 20px",fontSize:small?11:13,fontWeight:800,letterSpacing:1,cursor:off?"not-allowed":"pointer",width:full?"100%":"auto",textTransform:"uppercase",fontFamily:"inherit",opacity:off?0.5:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+    {loading&&<span style={{width:13,height:13,border:"2px solid currentColor",borderTopColor:"transparent",borderRadius:"50%",animation:"spin .7s linear infinite",display:"inline-block"}}/>}
+    {children}
+  </button>;
 };
 
-const getHorariosDia = (dia) => dia===“Sex” ? HORARIOS_SEXTA : HORARIOS_SEMANA;
+const Card=({children,style={},highlight})=><div style={{background:C.card,border:`1px solid ${highlight?highlight+"55":C.border}`,borderRadius:14,padding:16,marginBottom:12,...style}}>{children}</div>;
+const Bar=({value,max,color=C.accent,thin})=><div style={{height:thin?4:6,background:C.subtle,borderRadius:6,overflow:"hidden"}}><div style={{width:`${Math.min((value/max)*100,100)}%`,height:"100%",background:color,borderRadius:6,transition:"width .5s"}}/></div>;
+const Divider=()=><div style={{height:1,background:C.border,margin:"12px 0"}}/>;
+const Avatar=({nome,size=36,color=C.accent})=><div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.4,fontWeight:900,color}}>{nome[0]}</div>;
+const Logo=({size=32})=><img src="/favicon-512x512.png" alt="Amazonas" style={{width:size,height:size,borderRadius:size*0.22,objectFit:"cover",flexShrink:0}}/>;
 
-/* ─── MOCK DATA ──────────────────────────────────────────────── */
-const ALUNO = {
-nome:“Lucas Mendes”, plano:“Mensal”, vencimento:“30/04/2025”,
-checkinsMes:12, meta:15, streak:5,
-isento:false,
-};
+/* ════════════════════════════════════════════════════
+   LOGIN
+════════════════════════════════════════════════════ */
+function LoginScreen({onLogin}){
+  const [email,setEmail]=useState(""),  [senha,setSenha]=useState(""),  [showSenha,setShowSenha]=useState(false);
+  const [loading,setLoading]=useState(false),  [erro,setErro]=useState(""),  [sucesso,setSucesso]=useState("");
+  const [modo,setModo]=useState("login");
 
-const PR_DEFAULT = [
-{ id:1, exercicio:“Agachamento”, peso:“120kg” },
-{ id:2, exercicio:“Levantamento Terra”, peso:“150kg” },
-{ id:3, exercicio:“Clean”, peso:“80kg” },
-];
+  const limpar=()=>{setErro("");setSucesso("");};
+  const inp={width:"100%",background:C.subtle,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px 16px",color:C.text,fontSize:15,fontFamily:"inherit",boxSizing:"border-box"};
 
-const gerarAulas = () => {
-const hoje = getDiaSemana() || “Seg”;
-const horarios = getHorariosDia(hoje);
-return horarios.map((h,i)=>({
-id:i+1, hora:h, dia:“Hoje”,
-nome: h.includes(“12”)?“WOD Almoço”: h<“10:00”?“WOD Matinal”:“WOD Principal”,
-coach:[“Rafael”,“Camila”,“Thiago”][i%3],
-vagas:15, ocupadas:[3,8,12,5,7,10,13,6,4][i]||5,
-}));
-};
+  const handleLogin=async()=>{
+    if(!email||!senha){setErro("Preencha e-mail e senha.");return;}
+    setLoading(true);limpar();
+    const{error,data}=await sb.auth.signInWithPassword({email,password:senha});
+    setLoading(false);
+    if(error)setErro("E-mail ou senha incorretos.");
+    else onLogin(data.user);
+  };
+  const handleCadastro=async()=>{
+    if(!email||!senha){setErro("Preencha e-mail e senha.");return;}
+    if(senha.length<6){setErro("Senha precisa ter ao menos 6 caracteres.");return;}
+    setLoading(true);limpar();
+    const{error}=await sb.auth.signUp({email,password:senha});
+    setLoading(false);
+    if(error)setErro("Erro ao criar conta.");
+    else{setSucesso("Conta criada! Verifique seu e-mail.");setModo("login");}
+  };
+  const handleRecuperar=async()=>{
+    if(!email){setErro("Digite seu e-mail.");return;}
+    setLoading(true);limpar();
+    const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});
+    setLoading(false);
+    if(error)setErro("Erro ao enviar.");
+    else setSucesso("Link enviado! Verifique seu e-mail.");
+  };
 
-const AULAS = gerarAulas();
-
-const ADMIN_ALUNOS = [
-{ id:1, nome:“Lucas Mendes”,    plano:“Mensal”,    status:“ativo”,  venc:“30/04”, checkins:12, isento:false },
-{ id:2, nome:“Ana Paula Silva”, plano:“Trimestral”,status:“ativo”,  venc:“15/06”, checkins:16, isento:true  },
-{ id:3, nome:“Carlos Rocha”,    plano:“Mensal”,    status:“vencido”,venc:“01/04”, checkins:4,  isento:false },
-{ id:4, nome:“Fernanda Lima”,   plano:“Mensal”,    status:“ativo”,  venc:“22/04”, checkins:15, isento:true  },
-{ id:5, nome:“Marcos Souza”,    plano:“Anual”,     status:“ativo”,  venc:“10/12”, checkins:9,  isento:false },
-{ id:6, nome:“Beatriz Costa”,   plano:“Mensal”,    status:“ativo”,  venc:“28/04”, checkins:7,  isento:false },
-];
-
-const ESPERA_INIT = [
-{ id:1, nome:“Pedro Alves”,    aula:“WOD Principal 18:30”, tipo:“espera”,        status:“pendente”, hora:“14:22” },
-{ id:2, nome:“Juliana Matos”,  aula:“Aula Experimental”,   tipo:“experimental”,  status:“pendente”, hora:“13:05” },
-{ id:3, nome:“Ricardo Lima”,   aula:“WOD Matinal 05:30”,   tipo:“espera”,        status:“pendente”, hora:“11:47” },
-{ id:4, nome:“Camila Torres”,  aula:“Aula Experimental”,   tipo:“experimental”,  status:“pendente”, hora:“10:30” },
-];
-
-/* ─── ICONS ──────────────────────────────────────────────────── */
-const P = {
-home:    “M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.6 5.4 21 6 21H9M19 10L21 12M19 10V20C19 20.6 18.6 21 18 21H15M9 21C9 21 9 15 12 15C15 15 15 21 15 21M9 21H15”,
-calendar:“M8 2V6M16 2V6M3 10H21M5 4H19C20.1 4 21 4.9 21 6V20C21 21.1 20.1 22 19 22H5C3.9 22 3 21.1 3 20V6C3 4.9 3.9 4 5 4Z”,
-person:  “M20 21V19C20 16.8 18.2 15 16 15H8C5.8 15 4 16.8 4 19V21M12 11C14.2 11 16 9.2 16 7C16 4.8 14.2 3 12 3C9.8 3 8 4.8 8 7C8 9.2 9.8 11 12 11Z”,
-bell:    “M18 8A6 6 0 006 8C6 15 3 17 3 17H21S18 15 18 8ZM13.73 21A2 2 0 0110.27 21”,
-check:   “M9 12L11 14L15 10M21 12C21 16.97 16.97 21 12 21C7.03 21 3 16.97 3 12C3 7.03 7.03 3 12 3C16.97 3 21 7.03 21 12Z”,
-fire:    “M12 2C6 8 6 13 9 16C9 13 11 11 12 10C12 13 14 15 14 17C17 15 18 11 15 7C15 10 13 11 12 13C11 11 13 7 12 2Z”,
-users:   “M17 21V19C17 16.8 15.2 15 13 15H5C2.8 15 1 16.8 1 19V21M23 21V19C23 17.1 21.7 15.5 20 15.1M16 3.1C17.7 3.5 19 5.1 19 7S17.7 10.5 16 10.9M13 7C13 9.2 11.2 11 9 11C6.8 11 5 9.2 5 7S6.8 3 9 3S13 4.8 13 7Z”,
-x:       “M18 6L6 18M6 6L18 18”,
-lock:    “M19 11H5C3.9 11 3 11.9 3 13V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V13C21 11.9 20.1 11 19 11ZM12 17C11.4 17 11 16.6 11 16S11.4 15 12 15S13 15.4 13 16S12.6 17 12 17ZM17 11V7C17 4.2 14.8 2 12 2S7 4.2 7 7V11”,
-arrow:   “M19 12H5M12 5L5 12L12 19”,
-share:   “M8.59 13.51L15.42 17.49M15.41 6.51L8.59 10.49M21 5C21 6.66 19.66 8 18 8S15 6.66 15 5 16.34 2 18 2 21 3.34 21 5ZM9 12C9 13.66 7.66 15 6 15S3 13.66 3 12 4.34 9 6 9 9 10.34 9 12ZM21 19C21 20.66 19.66 22 18 22S15 20.66 15 19 16.34 16 18 16 21 17.34 21 19Z”,
-star:    “M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z”,
-list:    “M9 6H20M9 12H20M9 18H20M5 6V6.01M5 12V12.01M5 18V18.01”,
-chart:   “M18 20V10M12 20V4M6 20V14”,
-};
-const Icon = ({ name, size=22, color=C.muted }) => (
-<svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-<path d={P[name]||””} />
-</svg>
-);
-
-/* ─── ATOMS ──────────────────────────────────────────────────── */
-const Tag = ({ children, color }) => (
-<span style={{
-background:color+“20”,color,border:`1px solid ${color}40`,
-borderRadius:6,fontSize:10,fontWeight:700,
-letterSpacing:1,padding:“2px 8px”,textTransform:“uppercase”,
-}}>{children}</span>
-);
-
-const Btn = ({ children, onClick, variant=“primary”, small, full, disabled }) => {
-const bg = {primary:C.accent,danger:C.red,green:C.green,ghost:C.subtle}[variant]||C.subtle;
-const fg = (variant===“primary”||variant===“green”) ? “#000”:”#fff”;
-return (
-<button onClick={onClick} disabled={disabled} style={{
-background:disabled?C.subtle:bg, color:disabled?C.muted:fg,
-border:“none”, borderRadius:10,
-padding:small?“7px 14px”:“12px 20px”,
-fontSize:small?11:13, fontWeight:800,
-letterSpacing:1, cursor:disabled?“not-allowed”:“pointer”,
-width:full?“100%”:“auto”, textTransform:“uppercase”,
-fontFamily:“inherit”, opacity:disabled?0.4:1,
-}}>{children}</button>
-);
-};
-
-const Card = ({ children, style={}, highlight }) => (
-
-  <div style={{
-    background:C.card,
-    border:`1px solid ${highlight?highlight+"55":C.border}`,
-    borderRadius:14, padding:16, marginBottom:12, ...style,
-  }}>{children}</div>
-);
-
-const Bar = ({ value, max, color=C.accent, thin }) => (
-
-  <div style={{height:thin?4:6,background:C.subtle,borderRadius:6,overflow:"hidden"}}>
-    <div style={{
-      width:`${Math.min((value/max)*100,100)}%`,height:"100%",
-      background:color,borderRadius:6,transition:"width .5s",
-    }}/>
-  </div>
-);
-
-const Divider = () => <div style={{height:1,background:C.border,margin:“12px 0”}}/>;
-
-const Avatar = ({ nome, size=36, color=C.accent }) => (
-
-  <div style={{
-    width:size,height:size,borderRadius:"50%",flexShrink:0,
-    background:color+"22",display:"flex",alignItems:"center",
-    justifyContent:"center",fontSize:size*0.4,fontWeight:900,color,
-  }}>{nome[0]}</div>
-);
-
-/* ─── INSTALL POPUP ──────────────────────────────────────────── */
-function InstallPopup({ onClose, onNever }) {
-const isIOS     = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const isAndroid = /android/i.test(navigator.userAgent);
-// Se não detectar nenhum, mostra os dois
-const mostraIOS     = isIOS || (!isIOS && !isAndroid);
-const mostraAndroid = isAndroid || (!isIOS && !isAndroid);
-
-const Step = ({ n, text }) => (
-<div style={{display:“flex”,alignItems:“center”,gap:10,marginBottom:8}}>
-<div style={{width:22,height:22,borderRadius:“50%”,background:C.accent,
-color:”#000”,fontSize:11,fontWeight:900,display:“flex”,
-alignItems:“center”,justifyContent:“center”,flexShrink:0}}>{n}</div>
-<span style={{fontSize:13,color:C.text,fontWeight:600}}>{text}</span>
-</div>
-);
-
-const BlocoIOS = () => (
-<div style={{marginBottom: mostraAndroid ? 12 : 0}}>
-<div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:C.accent,
-textTransform:“uppercase”,marginBottom:8}}>📱 iPhone / iPad (Safari)</div>
-<Step n="1" text='Toque em Compartilhar na barra do Safari'/>
-<Step n="2" text='"Adicionar à Tela de Início"'/>
-<Step n="3" text='Confirme tocando em "Adicionar"'/>
-</div>
-);
-
-const BlocoAndroid = () => (
-<div>
-<div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:C.accent,
-textTransform:“uppercase”,marginBottom:8}}>🤖 Android (Chrome)</div>
-<Step n="1" text="Toque no menu (⋮) no canto superior direito"/>
-<Step n="2" text='"Adicionar à tela inicial"'/>
-<Step n="3" text="Confirme e pronto!"/>
-</div>
-);
-
-return (
-<div style={{position:“fixed”,inset:0,zIndex:999,background:“rgba(0,0,0,0.8)”,
-backdropFilter:“blur(6px)”,display:“flex”,alignItems:“flex-end”,justifyContent:“center”}}>
-<div style={{background:C.surface,borderRadius:“20px 20px 0 0”,
-border:`1px solid ${C.border}`,padding:“20px 20px 36px”,
-width:“100%”,maxWidth:430,animation:“slideUp .3s ease”}}>
-<div style={{width:40,height:4,background:C.border,borderRadius:4,margin:“0 auto 20px”}}/>
-<div style={{display:“flex”,alignItems:“center”,gap:12,marginBottom:18}}>
-<div style={{width:52,height:52,borderRadius:14,
-background:`linear-gradient(135deg,${C.accentD},${C.accent})`,
-display:“flex”,alignItems:“center”,justifyContent:“center”}}>
-<Icon name="fire" size={26} color="#000"/>
-</div>
-<div>
-<div style={{fontSize:18,fontWeight:900,color:C.accent,letterSpacing:1}}>CROSSFIT</div>
-<div style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:3}}>AMAZONAS</div>
-</div>
-</div>
-<div style={{fontSize:20,fontWeight:900,marginBottom:6}}>Adicione à tela inicial! 📲</div>
-<div style={{fontSize:13,color:C.muted,lineHeight:1.6,marginBottom:16}}>
-Acesse mais rápido e receba lembretes de aulas sem abrir o navegador.
-</div>
-<div style={{background:C.subtle,borderRadius:12,padding:14,marginBottom:18}}>
-{mostraIOS && <BlocoIOS/>}
-{mostraIOS && mostraAndroid && <div style={{height:1,background:C.border,margin:“12px 0”}}/>}
-{mostraAndroid && <BlocoAndroid/>}
-{isIOS && (
-<p style={{fontSize:11,color:C.muted,marginTop:10,fontWeight:600,lineHeight:1.5}}>
-⚠️ No iPhone, notificações só funcionam após adicionar à tela inicial.
-</p>
-)}
-</div>
-<Btn full onClick={onClose}>Entendido!</Btn>
-<button onClick={onNever} style={{background:“none”,border:“none”,color:C.muted,
-fontSize:11,fontWeight:700,cursor:“pointer”,width:“100%”,marginTop:12,
-fontFamily:“inherit”,letterSpacing:1,textTransform:“uppercase”}}>
-Não mostrar novamente
-</button>
-</div>
-<style>{`@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
-</div>
-);
-}
-
-/* ─── NOTIF BANNER ───────────────────────────────────────────── */
-function NotifBanner({ aula, onDismiss }) {
-return (
-<div style={{position:“fixed”,top:0,left:“50%”,transform:“translateX(-50%)”,
-width:“100%”,maxWidth:430,zIndex:500,
-background:`linear-gradient(90deg,${C.accentD},${C.accent})`,
-padding:“12px 16px”,display:“flex”,alignItems:“center”,
-justifyContent:“space-between”,animation:“slideDown .4s ease”}}>
-<div style={{display:“flex”,alignItems:“center”,gap:10}}>
-<Icon name="bell" size={18} color="#000"/>
-<div>
-<div style={{fontSize:12,fontWeight:900,color:”#000”}}>🔔 Sua aula começa em 10 min!</div>
-<div style={{fontSize:11,color:“rgba(0,0,0,0.65)”,fontWeight:700}}>
-{aula.hora} · {aula.nome} · Coach {aula.coach}
-</div>
-</div>
-</div>
-<button onClick={onDismiss} style={{background:“none”,border:“none”,cursor:“pointer”,padding:4}}>
-<Icon name="x" size={16} color="#000"/>
-</button>
-<style>{`@keyframes slideDown{from{transform:translate(-50%,-100%)}to{transform:translate(-50%,0)}}`}</style>
-</div>
-);
-}
-
-/* ══════════════════════════════════════════════════════════════
-TELAS DO ALUNO
-══════════════════════════════════════════════════════════════ */
-
-function HomeScreen({ reservas, setReservas, setTab, notifPerm, onAtivarNotif, prs }) {
-const proxima = AULAS.find(a=>reservas.includes(a.id));
-const { checkinsMes, meta, streak } = ALUNO;
-const atingiu = checkinsMes >= meta;
-const diasGrid = Array.from({length:20},(_,i)=>i+1);
-const presentes = [1,2,4,5,7,9,10,12,13,14,15,16];
-
-return (
-<div>
-{/* Hero */}
-<div style={{background:`linear-gradient(135deg,${C.accentD},${C.accent} 70%,#FF9500)`,
-borderRadius:18,padding:“22px 20px”,marginBottom:14,position:“relative”,overflow:“hidden”}}>
-<div style={{position:“absolute”,right:-20,top:-20,width:110,height:110,
-borderRadius:“50%”,background:“rgba(255,255,255,0.07)”}}/>
-<p style={{fontSize:11,fontWeight:700,letterSpacing:2,color:“rgba(0,0,0,0.5)”,
-textTransform:“uppercase”,marginBottom:3}}>
-{new Date().toLocaleDateString(“pt-BR”,{weekday:“long”,day:“2-digit”,month:“short”})}
-</p>
-<h1 style={{fontSize:26,fontWeight:900,color:”#000”,marginBottom:3,lineHeight:1.1}}>
-Bom dia, {ALUNO.nome.split(” “)[0]}! 🔥
-</h1>
-<p style={{fontSize:13,color:“rgba(0,0,0,0.55)”,fontWeight:600,marginBottom:16}}>
-{streak} dias seguidos · {ALUNO.plano}
-</p>
-
-```
-    {/* Barra de meta */}
-    <div style={{background:"rgba(0,0,0,0.18)",borderRadius:10,padding:"10px 14px"}}>
-      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-        <span style={{fontSize:11,fontWeight:800,color:"rgba(0,0,0,0.6)",
-          textTransform:"uppercase",letterSpacing:1}}>
-          Check-ins em Abril
-        </span>
-        <span style={{fontSize:13,fontWeight:900,color:"#000"}}>
-          {checkinsMes}/{meta} {atingiu?"🏆":""}
-        </span>
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div style={{textAlign:"center",marginBottom:36,animation:"fadeIn .5s ease"}}>
+        <img src="/favicon-512x512.png" alt="Amazonas" style={{width:110,height:110,borderRadius:20,objectFit:"cover",marginBottom:16,boxShadow:`0 0 40px ${C.accent}44`}}/>
+        <div style={{fontSize:28,fontWeight:900,letterSpacing:3,color:C.accent,lineHeight:1}}>AMAZONAS</div>
+        <div style={{fontSize:12,fontWeight:700,color:C.muted,letterSpacing:4,marginTop:4}}>ALTA PERFORMANCE</div>
       </div>
-      <Bar value={checkinsMes} max={meta} color={atingiu?"rgba(0,0,0,0.6)":"rgba(0,0,0,0.4)"}/>
-      <p style={{fontSize:10,color:"rgba(0,0,0,0.5)",fontWeight:700,marginTop:6}}>
-        {atingiu
-          ? "✅ Meta atingida! Você está isento de check-in pelo resto do mês."
-          : `Faltam ${meta-checkinsMes} check-ins para ficar isento pelo resto do mês!`}
-      </p>
-    </div>
-  </div>
-
-  {/* Isenção badge */}
-  {atingiu && (
-    <div style={{background:C.green+"18",border:`1px solid ${C.green}44`,
-      borderRadius:12,padding:"12px 14px",marginBottom:12,
-      display:"flex",alignItems:"center",gap:10}}>
-      <span style={{fontSize:20}}>🏆</span>
-      <div>
-        <div style={{fontSize:13,fontWeight:800,color:C.green}}>Você está isento este mês!</div>
-        <div style={{fontSize:11,color:C.muted}}>Atingiu 15 check-ins — sem obrigação nos dias restantes.</div>
-      </div>
-    </div>
-  )}
-
-  {/* Próxima aula */}
-  {proxima ? (
-    <Card highlight={C.accent}>
-      <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.accent,
-        textTransform:"uppercase",marginBottom:10}}>✅ Sua próxima aula</div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <div>
-          <div style={{fontSize:26,fontWeight:900,color:C.accent}}>{proxima.hora}</div>
-          <div style={{fontSize:16,fontWeight:800}}>{proxima.nome}</div>
-          <div style={{fontSize:12,color:C.muted,marginTop:2}}>Coach {proxima.coach}</div>
-        </div>
-        <div style={{background:C.accent+"18",border:`1px solid ${C.accent}33`,
-          borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
-          <div style={{fontSize:18}}>🔔</div>
-          <div style={{fontSize:9,fontWeight:700,color:C.accent,letterSpacing:.5,marginTop:2}}>LEMBRETE<br/>ATIVO</div>
-        </div>
-      </div>
-      <Divider/>
-      <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.muted,
-        textTransform:"uppercase",marginBottom:8}}>
-        Não esqueça do check-in no app:
-      </div>
-      <div style={{display:"flex",gap:8}}>
-        <button onClick={()=>window.open("https://wellhub.com","_blank")} style={{
-          flex:1,background:"#1B4DCC",border:"none",borderRadius:10,
-          padding:"11px 8px",cursor:"pointer",fontFamily:"inherit",
-          display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-          <span style={{fontSize:18}}>💪</span>
-          <span style={{fontSize:12,fontWeight:800,color:"#fff",letterSpacing:.5}}>Wellhub</span>
-        </button>
-        <button onClick={()=>window.open("https://totalpass.com","_blank")} style={{
-          flex:1,background:"#7C3AED",border:"none",borderRadius:10,
-          padding:"11px 8px",cursor:"pointer",fontFamily:"inherit",
-          display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-          <span style={{fontSize:18}}>⚡</span>
-          <span style={{fontSize:12,fontWeight:800,color:"#fff",letterSpacing:.5}}>Totalpass</span>
-        </button>
-      </div>
-      <p style={{fontSize:10,color:C.muted,marginTop:8,textAlign:"center",fontWeight:600}}>
-        Abre o app direto — é só confirmar sua presença no box
-      </p>
-    </Card>
-  ) : (
-    <Card>
-      <div style={{textAlign:"center",padding:"6px 0"}}>
-        <div style={{fontSize:13,color:C.muted,fontWeight:700,marginBottom:10}}>
-          Nenhuma aula reservada para hoje
-        </div>
-        <Btn small onClick={()=>setTab("aulas")}>Ver horários →</Btn>
-      </div>
-    </Card>
-  )}
-
-  {/* Notif banner */}
-  {notifPerm!=="granted" && (
-    <div style={{background:C.subtle,border:`1px solid ${C.border}`,
-      borderRadius:12,padding:"12px 14px",marginBottom:12,
-      display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <Icon name="bell" size={18} color={C.accent}/>
-        <div>
-          <div style={{fontSize:13,fontWeight:800}}>Ativar lembretes</div>
-          <div style={{fontSize:11,color:C.muted}}>Aviso 10 min antes da aula</div>
-        </div>
-      </div>
-      <Btn small onClick={onAtivarNotif}>Ativar</Btn>
-    </div>
-  )}
-
-  {/* PRs */}
-  <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,
-    textTransform:"uppercase",marginBottom:8}}>Meus PRs</div>
-  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
-    {prs.length===0
-      ? <div style={{gridColumn:"1/-1",background:C.card,border:`1px solid ${C.border}`,
-          borderRadius:12,padding:"12px",textAlign:"center",fontSize:12,color:C.muted}}>
-          Adicione PRs na aba Perfil
-        </div>
-      : prs.map(pr=>(
-        <div key={pr.id} style={{background:C.card,border:`1px solid ${C.border}`,
-          borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
-          <div style={{fontSize:18,fontWeight:900,color:C.accent}}>{pr.peso}</div>
-          <div style={{fontSize:9,fontWeight:700,color:C.muted,textTransform:"uppercase",
-            letterSpacing:1,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",
-            whiteSpace:"nowrap"}}>{pr.exercicio}</div>
-        </div>
-      ))
-    }
-  </div>
-
-  {/* Calendário */}
-  <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,
-    textTransform:"uppercase",marginBottom:8}}>Frequência — Abril</div>
-  <Card>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
-      {diasGrid.map(d=>(
-        <div key={d} style={{aspectRatio:"1",borderRadius:6,
-          background:presentes.includes(d)?C.accent:C.subtle,
-          display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize:10,fontWeight:700,
-          color:presentes.includes(d)?"#000":C.muted}}>{d}</div>
-      ))}
-    </div>
-  </Card>
-</div>
-```
-
-);
-}
-
-/* AULAS */
-function AulasScreen({ reservas, setReservas }) {
-const hoje = getDiaSemana();
-const diasDisponiveis = hoje ? DIAS.slice(DIAS.indexOf(hoje)) : DIAS;
-const [diaIdx, setDiaIdx] = useState(0);
-const diaSel = diasDisponiveis[diaIdx] || “Seg”;
-const horarios = getHorariosDia(diaSel);
-
-const aulasDia = horarios.map((h,i)=>({
-id: diaIdx*100+i, hora:h, dia:diaSel,
-nome: h<“10:00”?“WOD Matinal”:h===“12:00”?“WOD Almoço”:“WOD Principal”,
-coach:[“Rafael”,“Camila”,“Thiago”][i%3],
-vagas:15, ocupadas:[3,8,12,5,7,10,13,6,4][i]||5,
-}));
-
-return (
-<div>
-<h2 style={{fontSize:26,fontWeight:900,letterSpacing:1,marginBottom:4}}>AULAS</h2>
-<p style={{fontSize:13,color:C.muted,marginBottom:14}}>
-Seg–Qui: 9 horários · Sex: 8 horários · Sáb/Dom: treino especial
-</p>
-
-```
-  {/* Experimental */}
-  <div style={{background:`linear-gradient(120deg,${C.accentD},${C.accent})`,
-    borderRadius:14,padding:"16px 18px",marginBottom:14,
-    display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-    <div>
-      <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:"rgba(0,0,0,0.5)",textTransform:"uppercase"}}>
-        Convide um amigo
-      </div>
-      <div style={{fontSize:18,fontWeight:900,color:"#000",marginTop:2}}>Aula Experimental</div>
-      <div style={{fontSize:12,color:"rgba(0,0,0,0.55)",marginTop:3}}>Grátis · Sem compromisso</div>
-    </div>
-    <Btn small onClick={()=>alert("Solicitação enviada! O coach vai confirmar em breve.")}>Agendar</Btn>
-  </div>
-
-  {/* Dias */}
-  <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:4}}>
-    {diasDisponiveis.map((d,i)=>(
-      <button key={d} onClick={()=>setDiaIdx(i)} style={{
-        background:i===diaIdx?C.accent:C.subtle,
-        color:i===diaIdx?"#000":C.muted,
-        border:"none",borderRadius:10,padding:"8px 18px",
-        fontWeight:800,fontSize:12,letterSpacing:1,
-        cursor:"pointer",fontFamily:"inherit",textTransform:"uppercase",
-        whiteSpace:"nowrap",flexShrink:0,
-      }}>{i===0?"Hoje":d}</button>
-    ))}
-  </div>
-
-  {aulasDia.map(a=>{
-    const cheia=a.ocupadas>=a.vagas;
-    const reservado=reservas.includes(a.id);
-    const pct=a.ocupadas/a.vagas;
-    const cor=pct>=1?C.red:pct>=.75?C.accent:C.green;
-    return (
-      <Card key={a.id} highlight={reservado?C.accent:null}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-          <div>
-            <div style={{fontSize:24,fontWeight:900,color:reservado?C.accent:C.text}}>{a.hora}</div>
-            <div style={{fontSize:15,fontWeight:800,marginTop:1}}>{a.nome}</div>
-            <div style={{fontSize:12,color:C.muted,marginTop:2}}>Coach {a.coach}</div>
+      <div style={{width:"100%",maxWidth:340,animation:"fadeIn .5s ease .1s both"}}>
+        {modo!=="recuperar"&&(
+          <div style={{display:"flex",background:C.subtle,borderRadius:12,padding:4,marginBottom:24}}>
+            {[["login","Entrar"],["cadastro","Criar conta"]].map(([m,l])=>(
+              <button key={m} onClick={()=>{setModo(m);limpar();}} style={{flex:1,background:modo===m?C.accent:"none",color:modo===m?"#000":C.muted,border:"none",borderRadius:10,padding:"10px",fontWeight:800,fontSize:13,letterSpacing:1,cursor:"pointer",fontFamily:"inherit",textTransform:"uppercase"}}>{l}</button>
+            ))}
           </div>
-          {reservado?<Tag color={C.accent}>✓ Reservado</Tag>
-            :cheia?<Tag color={C.red}>Lotado</Tag>
-            :<Tag color={C.green}>Disponível</Tag>}
-        </div>
-        <div style={{marginBottom:12}}>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-            <span style={{fontSize:10,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>Vagas</span>
-            <span style={{fontSize:12,fontWeight:800,color:cor}}>{a.ocupadas}/{a.vagas}</span>
+        )}
+        {modo==="recuperar"&&(
+          <div style={{marginBottom:20}}>
+            <button onClick={()=>{setModo("login");limpar();}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit",fontSize:12,fontWeight:700}}>
+              <Icon name="arrow" size={14} color={C.muted}/> Voltar
+            </button>
+            <div style={{fontSize:20,fontWeight:900,marginTop:12,marginBottom:4}}>Recuperar senha</div>
+            <div style={{fontSize:13,color:C.muted}}>Enviaremos um link para seu e-mail.</div>
           </div>
-          <Bar value={a.ocupadas} max={a.vagas} color={cor} thin/>
-        </div>
-        {reservado
-          ?<Btn full variant="ghost" onClick={()=>setReservas(reservas.filter(r=>r!==a.id))}>Cancelar reserva</Btn>
-          :<Btn full disabled={cheia}
-            onClick={()=>!cheia&&setReservas([...reservas,a.id])}>
-            {cheia?"Entrar na lista de espera":"Reservar vaga"}
-          </Btn>}
-      </Card>
-    );
-  })}
-</div>
-```
-
-);
-}
-
-/* PERFIL */
-function PerfilScreen({ prs, salvarPRs }) {
-const { nome, plano, vencimento, checkinsMes, meta, streak } = ALUNO;
-const atingiu = checkinsMes >= meta;
-
-const [showForm, setShowForm] = useState(false);
-const [novoEx, setNovoEx]     = useState(””);
-const [novoPeso, setNovoPeso] = useState(””);
-const [editId, setEditId]     = useState(null);
-
-const abrirNovo = () => {
-setEditId(null); setNovoEx(””); setNovoPeso(””); setShowForm(true);
-};
-
-const abrirEditar = (pr) => {
-setEditId(pr.id); setNovoEx(pr.exercicio); setNovoPeso(pr.peso); setShowForm(true);
-};
-
-const salvar = () => {
-if (!novoEx.trim() || !novoPeso.trim()) return;
-let lista;
-if (editId) {
-lista = prs.map(p => p.id===editId ? {…p, exercicio:novoEx.trim(), peso:novoPeso.trim()} : p);
-} else {
-lista = […prs, { id: Date.now(), exercicio:novoEx.trim(), peso:novoPeso.trim() }];
-}
-salvarPRs(lista);
-setShowForm(false); setNovoEx(””); setNovoPeso(””); setEditId(null);
-};
-
-const excluir = (id) => salvarPRs(prs.filter(p => p.id !== id));
-
-const hist = [
-{data:“07/04”,aula:“WOD Principal”,hora:“18:30”,coach:“Thiago”},
-{data:“05/04”,aula:“WOD Matinal”,hora:“05:30”,coach:“Rafael”},
-{data:“04/04”,aula:“WOD Almoço”,hora:“12:00”,coach:“Camila”},
-{data:“03/04”,aula:“WOD Principal”,hora:“17:30”,coach:“Thiago”},
-{data:“02/04”,aula:“WOD Matinal”,hora:“06:30”,coach:“Rafael”},
-];
-
-const inputStyle = {
-flex:1, background:C.subtle, border:`1px solid ${C.border}`,
-borderRadius:8, padding:“10px 12px”, color:C.text,
-fontSize:14, fontFamily:“inherit”, outline:“none”,
-};
-
-return (
-<div>
-{/* Avatar */}
-<div style={{textAlign:“center”,padding:“10px 0 22px”}}>
-<div style={{width:80,height:80,borderRadius:“50%”,
-background:`linear-gradient(135deg,${C.accentD},${C.accent})`,
-margin:“0 auto 12px”,display:“flex”,alignItems:“center”,
-justifyContent:“center”,fontSize:30,fontWeight:900,color:”#000”}}>
-{nome[0]}
-</div>
-<div style={{fontSize:22,fontWeight:900}}>{nome}</div>
-<div style={{fontSize:13,color:C.muted,marginTop:3}}>{plano} · Vence {vencimento}</div>
-<div style={{display:“flex”,gap:8,justifyContent:“center”,marginTop:10,flexWrap:“wrap”}}>
-<Tag color={C.green}>Ativo</Tag>
-<Tag color={C.accent}>🔥 {streak} dias seguidos</Tag>
-{atingiu && <Tag color={C.yellow}>🏆 Isento este mês</Tag>}
-</div>
-</div>
-
-```
-  {/* Meta check-ins */}
-  <Card highlight={atingiu?C.green:null}>
-    <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-      <div>
-        <div style={{fontSize:14,fontWeight:800}}>Meta de Check-ins</div>
-        <div style={{fontSize:11,color:C.muted,marginTop:2}}>
-          {atingiu?"🏆 Meta atingida! Isento pelo resto do mês."
-            :`Faltam ${meta-checkinsMes} para ficar isento`}
-        </div>
-      </div>
-      <div style={{fontSize:26,fontWeight:900,color:atingiu?C.green:C.accent}}>
-        {checkinsMes}<span style={{fontSize:14,color:C.muted}}>/{meta}</span>
-      </div>
-    </div>
-    <Bar value={checkinsMes} max={meta} color={atingiu?C.green:C.accent}/>
-    {!atingiu && (
-      <div style={{marginTop:10,background:C.subtle,borderRadius:8,padding:"8px 12px"}}>
-        <div style={{fontSize:11,fontWeight:700,color:C.muted,lineHeight:1.5}}>
-          💡 Faça 15 check-ins no mês e fique isento de registrar presença nos dias restantes.
-        </div>
-      </div>
-    )}
-  </Card>
-
-  {/* Stats */}
-  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-    <Card style={{margin:0,textAlign:"center"}}>
-      <div style={{fontSize:28,fontWeight:900,color:C.accent}}>{checkinsMes}</div>
-      <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1}}>Check-ins Abril</div>
-    </Card>
-    <Card style={{margin:0,textAlign:"center"}}>
-      <div style={{fontSize:28,fontWeight:900,color:C.green}}>{streak}</div>
-      <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1}}>Dias Seguidos</div>
-    </Card>
-  </div>
-
-  {/* PRs editáveis */}
-  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-    <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase"}}>
-      Recordes Pessoais
-    </div>
-    <Btn small onClick={abrirNovo}>+ Novo PR</Btn>
-  </div>
-
-  {/* Formulário novo/editar PR */}
-  {showForm && (
-    <Card highlight={C.accent} style={{marginBottom:12}}>
-      <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.accent,
-        textTransform:"uppercase",marginBottom:12}}>
-        {editId ? "Editar PR" : "Novo PR"}
-      </div>
-      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
-        <input
-          value={novoEx} onChange={e=>setNovoEx(e.target.value)}
-          placeholder="Exercício (ex: Snatch, Deadlift...)"
-          style={{...inputStyle,width:"100%",boxSizing:"border-box"}}
-        />
-        <input
-          value={novoPeso} onChange={e=>setNovoPeso(e.target.value)}
-          placeholder="Peso (ex: 95kg, 1:45 min...)"
-          style={{...inputStyle,width:"100%",boxSizing:"border-box"}}
-        />
-      </div>
-      <div style={{display:"flex",gap:8}}>
-        <Btn full onClick={salvar}>Salvar</Btn>
-        <Btn full variant="ghost" onClick={()=>setShowForm(false)}>Cancelar</Btn>
-      </div>
-    </Card>
-  )}
-
-  {prs.length === 0 ? (
-    <Card>
-      <div style={{textAlign:"center",padding:"12px 0"}}>
-        <div style={{fontSize:24,marginBottom:8}}>🏋️</div>
-        <div style={{fontSize:13,color:C.muted,fontWeight:700}}>Nenhum PR registrado ainda</div>
-        <div style={{fontSize:11,color:C.muted,marginTop:4}}>Toque em "+ Novo PR" para começar</div>
-      </div>
-    </Card>
-  ) : (
-    <Card>
-      {prs.map((pr,i)=>(
-        <div key={pr.id}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
-            <div>
-              <div style={{fontSize:14,fontWeight:800}}>{pr.exercicio}</div>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:20,fontWeight:900,color:C.accent}}>{pr.peso}</span>
-              <button onClick={()=>abrirEditar(pr)} style={{
-                background:"none",border:`1px solid ${C.border}`,
-                borderRadius:6,padding:"4px 8px",cursor:"pointer",
-                fontSize:10,fontWeight:700,color:C.muted,fontFamily:"inherit",letterSpacing:.5,
-              }}>Editar</button>
-              <button onClick={()=>excluir(pr.id)} style={{
-                background:"none",border:"none",cursor:"pointer",padding:4,
-              }}>
-                <Icon name="x" size={14} color={C.red}/>
-              </button>
-            </div>
+        )}
+        {sucesso&&<div style={{background:C.green+"18",border:`1px solid ${C.green}44`,borderRadius:12,padding:"12px 14px",marginBottom:16,fontSize:13,fontWeight:700,color:C.green}}>✅ {sucesso}</div>}
+        <div style={{marginBottom:12}}><input type="email" value={email} onChange={e=>{setEmail(e.target.value);limpar();}} placeholder="E-mail" style={inp}/></div>
+        {modo!=="recuperar"&&(
+          <div style={{position:"relative",marginBottom:8}}>
+            <input type={showSenha?"text":"password"} value={senha} onChange={e=>{setSenha(e.target.value);limpar();}} onKeyDown={e=>e.key==="Enter"&&(modo==="login"?handleLogin():handleCadastro())} placeholder="Senha" style={{...inp,paddingRight:48}}/>
+            <button onClick={()=>setShowSenha(!showSenha)} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",padding:4}}><Icon name={showSenha?"eyeOff":"eye"} size={18} color={C.muted}/></button>
           </div>
-          {i<prs.length-1&&<Divider/>}
-        </div>
-      ))}
-    </Card>
-  )}
-
-  {/* Histórico */}
-  <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,
-    textTransform:"uppercase",marginBottom:8,marginTop:4}}>Histórico Recente</div>
-  {hist.map((h,i)=>(
-    <div key={i} style={{background:C.card,border:`1px solid ${C.border}`,
-      borderRadius:12,padding:"12px 14px",marginBottom:8,
-      display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-      <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <div style={{width:36,height:36,borderRadius:10,background:C.accent+"22",
-          display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <Icon name="check" size={18} color={C.accent}/>
-        </div>
-        <div>
-          <div style={{fontSize:14,fontWeight:800}}>{h.hora} · {h.aula}</div>
-          <div style={{fontSize:11,color:C.muted,marginTop:1}}>Coach {h.coach}</div>
+        )}
+        {erro&&<div style={{fontSize:12,color:C.red,fontWeight:700,marginBottom:12,padding:"8px 12px",background:C.red+"14",borderRadius:8,border:`1px solid ${C.red}33`}}>⚠️ {erro}</div>}
+        <div style={{marginTop:16}}>
+          {modo==="login"&&<><Btn full loading={loading} onClick={handleLogin}>Entrar</Btn><button onClick={()=>{setModo("recuperar");limpar();}} style={{background:"none",border:"none",color:C.muted,fontSize:12,fontWeight:700,cursor:"pointer",width:"100%",marginTop:14,fontFamily:"inherit"}}>Esqueci minha senha</button></>}
+          {modo==="cadastro"&&<Btn full loading={loading} onClick={handleCadastro}>Criar conta</Btn>}
+          {modo==="recuperar"&&<Btn full loading={loading} onClick={handleRecuperar}>Enviar link</Btn>}
         </div>
       </div>
-      <span style={{fontSize:11,fontWeight:700,color:C.muted}}>{h.data}</span>
     </div>
-  ))}
-</div>
-```
-
-);
+  );
 }
 
-/* ══════════════════════════════════════════════════════════════
-ÁREA ADMIN — TELA CHEIA
-══════════════════════════════════════════════════════════════ */
-
-function AdminLogin({ onLogin }) {
-const [senha, setSenha] = useState(””);
-const [erro, setErro]   = useState(false);
-const tentar = () => senha===“admin123” ? onLogin() : (setErro(true),setSenha(””));
-
-return (
-<div style={{minHeight:“100vh”,background:C.bg,display:“flex”,
-flexDirection:“column”,alignItems:“center”,justifyContent:“center”,padding:24}}>
-<div style={{width:64,height:64,borderRadius:16,
-background:`linear-gradient(135deg,${C.accentD},${C.accent})`,
-display:“flex”,alignItems:“center”,justifyContent:“center”,marginBottom:20}}>
-<Icon name="lock" size={30} color="#000"/>
-</div>
-<div style={{fontSize:24,fontWeight:900,letterSpacing:1,marginBottom:4}}>ÁREA ADMIN</div>
-<div style={{fontSize:13,color:C.muted,marginBottom:30,textAlign:“center”}}>
-CrossFit Amazonas · Acesso restrito
-</div>
-<div style={{width:“100%”,maxWidth:320}}>
-<input type=“password” value={senha}
-onChange={e=>{setSenha(e.target.value);setErro(false);}}
-onKeyDown={e=>e.key===“Enter”&&tentar()}
-placeholder=“Senha de acesso…”
-style={{width:“100%”,background:C.card,
-border:`2px solid ${erro?C.red:C.border}`,
-borderRadius:12,padding:“14px 16px”,color:C.text,
-fontSize:16,fontFamily:“inherit”,outline:“none”,
-boxSizing:“border-box”,marginBottom:8,
-textAlign:“center”,letterSpacing:6}}
-/>
-{erro&&<p style={{fontSize:12,color:C.red,fontWeight:700,textAlign:“center”,marginBottom:8}}>Senha incorreta</p>}
-<Btn full onClick={tentar}>Entrar</Btn>
-<p style={{fontSize:10,color:C.muted,textAlign:“center”,marginTop:10}}>Demo: admin123</p>
-</div>
-</div>
-);
-}
-
-function AdminPanel({ onSair }) {
-const [aba, setAba]         = useState(“dashboard”);
-const [pedidos, setPedidos] = useState(ESPERA_INIT);
-
-const pendentes = pedidos.filter(p=>p.status===“pendente”).length;
-const isentos   = ADMIN_ALUNOS.filter(a=>a.checkins>=15);
-const vencidos  = ADMIN_ALUNOS.filter(a=>a.status===“vencido”);
-
-const responder = (id, resp) => setPedidos(pedidos.map(p=>p.id===id?{…p,status:resp}:p));
-
-const abas = [
-{id:“dashboard”, label:“Dashboard”, icon:“home”},
-{id:“pedidos”,   label:“Pedidos”,   icon:“bell”,  badge:pendentes},
-{id:“alunos”,    label:“Alunos”,    icon:“users”},
-];
-
-return (
-<div style={{minHeight:“100vh”,background:C.bg,maxWidth:430,margin:“0 auto”}}>
-{/* Admin header */}
-<div style={{background:”#0D0D0D”,borderBottom:`1px solid ${C.border}`,
-padding:“14px 16px”,display:“flex”,alignItems:“center”,justifyContent:“space-between”,
-position:“sticky”,top:0,zIndex:100}}>
-<div style={{display:“flex”,alignItems:“center”,gap:10}}>
-<div style={{width:30,height:30,borderRadius:8,
-background:`linear-gradient(135deg,${C.accentD},${C.accent})`,
-display:“flex”,alignItems:“center”,justifyContent:“center”}}>
-<Icon name="fire" size={16} color="#000"/>
-</div>
-<div>
-<div style={{fontSize:13,fontWeight:900,color:C.accent,letterSpacing:1,lineHeight:1}}>ADMIN</div>
-<div style={{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:2,lineHeight:1}}>CROSSFIT AMAZONAS</div>
-</div>
-</div>
-<button onClick={onSair} style={{background:C.subtle,border:`1px solid ${C.border}`,
-borderRadius:8,padding:“6px 12px”,cursor:“pointer”,display:“flex”,
-alignItems:“center”,gap:6}}>
-<Icon name="arrow" size={14} color={C.muted}/>
-<span style={{fontSize:11,fontWeight:700,color:C.muted,fontFamily:“inherit”,letterSpacing:1}}>SAIR</span>
-</button>
-</div>
-
-```
-  {/* Conteúdo */}
-  <div style={{padding:"16px 16px 90px"}}>
-
-    {/* DASHBOARD */}
-    {aba==="dashboard" && (
-      <div>
-        <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:C.muted,
-          textTransform:"uppercase",marginBottom:12}}>Visão Geral — Hoje</div>
-
-        {/* Cards clicáveis */}
-        {(()=>{
-          const [expandido, setExpandido] = useState(null);
-          const ativos  = ADMIN_ALUNOS.filter(a=>a.status==="ativo");
-          const isentos2 = ADMIN_ALUNOS.filter(a=>a.checkins>=15);
-          const cards = [
-            {id:"ativos",   label:"Alunos Ativos", val:ativos.length,          color:C.accent, icon:"users",    lista:ativos},
-            {id:"isentos",  label:"Isentos Mês",   val:isentos2.length,         color:C.green,  icon:"star",     lista:isentos2},
-            {id:"pendentes",label:"Pendentes",      val:pendentes,               color:C.yellow, icon:"bell",     lista:[]},
-            {id:"total",    label:"Total Alunos",   val:ADMIN_ALUNOS.length,     color:C.blue,   icon:"users",    lista:ADMIN_ALUNOS},
-          ];
-          return (
-            <>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-                {cards.map(s=>(
-                  <div key={s.id}
-                    onClick={()=>s.lista.length>0&&setExpandido(expandido===s.id?null:s.id)}
-                    style={{background:C.card,border:`1px solid ${expandido===s.id?s.color:s.color+"33"}`,
-                      borderRadius:14,padding:"16px 14px",
-                      cursor:s.lista.length>0?"pointer":"default",
-                      transition:"border-color .2s"}}>
-                    <Icon name={s.icon} size={18} color={s.color}/>
-                    <div style={{fontSize:28,fontWeight:900,color:s.color,marginTop:8,lineHeight:1}}>{s.val}</div>
-                    <div style={{fontSize:10,fontWeight:700,color:C.muted,
-                      textTransform:"uppercase",letterSpacing:1,marginTop:4}}>{s.label}</div>
-                    {s.lista.length>0&&(
-                      <div style={{fontSize:9,color:s.color,fontWeight:700,marginTop:4,letterSpacing:1}}>
-                        {expandido===s.id?"▲ fechar":"▼ ver lista"}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Lista expandida */}
-              {expandido && cards.find(c=>c.id===expandido)?.lista.length>0 && (
-                <div style={{marginBottom:14}}>
-                  {cards.find(c=>c.id===expandido).lista.map(a=>{
-                    const cor = cards.find(c=>c.id===expandido).color;
-                    return (
-                      <div key={a.id} style={{background:C.card,border:`1px solid ${cor}33`,
-                        borderRadius:12,padding:"11px 14px",marginBottom:6,
-                        display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:10}}>
-                          <Avatar nome={a.nome} color={cor} size={32}/>
-                          <div>
-                            <div style={{fontWeight:800,fontSize:13}}>{a.nome}</div>
-                            <div style={{fontSize:10,color:C.muted}}>{a.plano} · Vence {a.venc}</div>
-                          </div>
-                        </div>
-                        <div style={{textAlign:"right"}}>
-                          <div style={{fontSize:15,fontWeight:900,color:cor}}>{a.checkins}</div>
-                          <div style={{fontSize:9,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>check-ins</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          );
-        })()}
-
-        {/* Isentos destaque */}
-        <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,
-          textTransform:"uppercase",marginBottom:8}}>🏆 Isentos este mês</div>
-        {isentos.length===0
-          ? <Card><div style={{fontSize:13,color:C.muted,textAlign:"center",padding:"8px 0"}}>Nenhum aluno atingiu 15 check-ins ainda</div></Card>
-          : isentos.map(a=>(
-            <div key={a.id} style={{background:C.green+"0F",border:`1px solid ${C.green}33`,
-              borderRadius:12,padding:"12px 14px",marginBottom:8,
-              display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <Avatar nome={a.nome} color={C.green}/>
-                <div>
-                  <div style={{fontWeight:800,fontSize:14}}>{a.nome}</div>
-                  <div style={{fontSize:11,color:C.muted}}>{a.plano} · Vence {a.venc}</div>
-                </div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:20,fontWeight:900,color:C.green}}>{a.checkins}</div>
-                <div style={{fontSize:9,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>check-ins</div>
-              </div>
-            </div>
-          ))}
-      </div>
-    )}
-
-    {/* PEDIDOS */}
-    {aba==="pedidos" && (
-      <div>
-        <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:C.muted,
-          textTransform:"uppercase",marginBottom:4}}>Solicitações</div>
-        <p style={{fontSize:13,color:C.muted,marginBottom:14}}>
-          Lista de espera e aulas experimentais aguardando resposta
-        </p>
-        {pedidos.map(p=>{
-          const cor = p.tipo==="experimental"?C.blue:C.yellow;
-          return (
-            <Card key={p.id} highlight={p.status==="pendente"?cor:p.status==="aceito"?C.green:C.red}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <Avatar nome={p.nome} color={cor}/>
-                  <div>
-                    <div style={{fontWeight:800,fontSize:14}}>{p.nome}</div>
-                    <div style={{fontSize:11,color:C.muted,marginTop:2}}>{p.aula}</div>
-                    <div style={{fontSize:10,color:C.muted,marginTop:1}}>Solicitado às {p.hora}</div>
-                  </div>
-                </div>
-                <Tag color={p.tipo==="experimental"?C.blue:C.yellow}>
-                  {p.tipo==="experimental"?"Experimental":"Lista Espera"}
-                </Tag>
-              </div>
-              {p.status==="pendente" ? (
-                <div style={{display:"flex",gap:8}}>
-                  <Btn full variant="green" small onClick={()=>responder(p.id,"aceito")}>✓ Aceitar</Btn>
-                  <Btn full variant="danger" small onClick={()=>responder(p.id,"recusado")}>✗ Recusar</Btn>
-                </div>
-              ) : (
-                <div style={{textAlign:"center"}}>
-                  <Tag color={p.status==="aceito"?C.green:C.red}>
-                    {p.status==="aceito"?"✓ Aceito":"✗ Recusado"}
-                  </Tag>
-                </div>
-              )}
-            </Card>
-          );
-        })}
-      </div>
-    )}
-
-    {/* ALUNOS */}
-    {aba==="alunos" && (
-      <div>
-        <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:C.muted,
-          textTransform:"uppercase",marginBottom:14}}>Alunos — Check-ins do mês</div>
-        {ADMIN_ALUNOS.sort((a,b)=>b.checkins-a.checkins).map(a=>{
-          const atingiu = a.checkins>=15;
-          const cor = a.status==="vencido"?C.red:atingiu?C.green:C.accent;
-          return (
-            <Card key={a.id} highlight={atingiu?C.green:a.status==="vencido"?C.red:null}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <Avatar nome={a.nome} color={cor}/>
-                  <div>
-                    <div style={{fontWeight:800,fontSize:15}}>{a.nome}</div>
-                    <div style={{fontSize:11,color:C.muted,marginTop:2}}>{a.plano} · Vence {a.venc}</div>
-                  </div>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-                  <Tag color={a.status==="ativo"?C.green:C.red}>{a.status}</Tag>
-                  {atingiu&&<Tag color={C.green}>🏆 Isento</Tag>}
-                </div>
-              </div>
-              <div>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                  <span style={{fontSize:10,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
-                    Check-ins
-                  </span>
-                  <span style={{fontSize:13,fontWeight:900,color:cor}}>
-                    {a.checkins}/15 {atingiu?"✅":""}
-                  </span>
-                </div>
-                <Bar value={a.checkins} max={15} color={cor} thin/>
-                {atingiu&&(
-                  <div style={{marginTop:8,background:C.green+"18",border:`1px solid ${C.green}33`,
-                    borderRadius:8,padding:"6px 10px"}}>
-                    <span style={{fontSize:11,color:C.green,fontWeight:700}}>
-                      Isento — não precisa fazer check-in pelo resto do mês
-                    </span>
-                  </div>
-                )}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-    )}
-
-  </div>
-
-  {/* Admin bottom nav */}
-  <div style={{display:"flex",background:"#0D0D0D",borderTop:`1px solid ${C.border}`,
-    position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
-    width:"100%",maxWidth:430,zIndex:100}}>
-    {abas.map(t=>{
-      const active=aba===t.id;
-      return (
-        <button key={t.id} onClick={()=>setAba(t.id)} style={{
-          flex:1,display:"flex",flexDirection:"column",alignItems:"center",
-          padding:"10px 0 14px",background:"none",border:"none",
-          borderTop:active?`2px solid ${C.accent}`:"2px solid transparent",
-          cursor:"pointer",position:"relative"}}>
-          <Icon name={t.icon} size={20} color={active?C.accent:C.muted}/>
-          {t.badge>0&&(
-            <div style={{position:"absolute",top:6,right:"50%",marginRight:-18,
-              width:16,height:16,borderRadius:"50%",background:C.red,
-              fontSize:9,fontWeight:900,color:"#fff",
-              display:"flex",alignItems:"center",justifyContent:"center"}}>
-              {t.badge}
-            </div>
-          )}
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:1,marginTop:4,
-            color:active?C.accent:C.muted,textTransform:"uppercase",
-            fontFamily:"'Barlow Condensed',sans-serif"}}>{t.label}</span>
-        </button>
-      );
-    })}
-  </div>
-</div>
-```
-
-);
-}
-
-/* ══════════════════════════════════════════════════════════════
-APP ROOT
-══════════════════════════════════════════════════════════════ */
-export default function App() {
-const [tab,setTab]             = useState(“home”);
-const [reservas,setReservas]   = useState([]);
-const [adminMode,setAdminMode] = useState(false);
-const [adminAuth,setAdminAuth] = useState(false);
-const [showInstall,setShowInstall] = useState(false); // começa false, só abre após checar storage
-const [notifPerm,setNotifPerm] = useState(“default”);
-const [banner,setBanner]       = useState(null);
-const [prs, setPrs]            = useState(PR_DEFAULT);
-const timerRef                 = useRef(null);
-
-// Carregar PRs e preferência do popup do storage na inicialização
-useEffect(()=>{
-(async()=>{
-try {
-const resPR = await window.storage.get(“prs”);
-if(resPR) setPrs(JSON.parse(resPR.value));
-} catch(*){}
-try {
-const resPopup = await window.storage.get(“install-never-show”);
-if(!resPopup) setShowInstall(true); // nunca clicou “não mostrar” → mostra
-} catch(*){
-setShowInstall(true); // chave não existe → mostra
-}
-})();
-},[]);
-
-const fecharInstall = () => setShowInstall(false);
-const nuncaMostrar  = async () => {
-setShowInstall(false);
-try { await window.storage.set(“install-never-show”,“1”); } catch(_){}
-};
-
-const salvarPRs = async(lista)=>{
-setPrs(lista);
-try { await window.storage.set(“prs”, JSON.stringify(lista)); } catch(_){}
-};
-
-useEffect(()=>{
-const res = AULAS.find(a=>reservas.includes(a.id));
-if(!res){setBanner(null);return;}
-if(timerRef.current) clearTimeout(timerRef.current);
-timerRef.current = setTimeout(()=>setBanner(res),4000);
-return ()=>clearTimeout(timerRef.current);
-},[reservas]);
-
-const ativarNotif = async()=>{
-if(!(“Notification” in window)){alert(“Adicione o app à tela inicial para ativar notificações.”);return;}
-const p = await Notification.requestPermission();
-setNotifPerm(p);
-if(p===“granted”) new Notification(“CrossFit Amazonas 🔥”,{body:“Notificações ativadas!”});
-};
-
-// ADMIN MODE
-if(adminMode){
-if(!adminAuth) return <AdminLogin onLogin={()=>setAdminAuth(true)}/>;
-return <AdminPanel onSair={()=>{setAdminMode(false);setAdminAuth(false);}}/>;
-}
-
-const screens = {
-home:   <HomeScreen reservas={reservas} setReservas={setReservas} setTab={setTab} notifPerm={notifPerm} onAtivarNotif={ativarNotif} prs={prs}/>,
-aulas:  <AulasScreen reservas={reservas} setReservas={setReservas}/>,
-perfil: <PerfilScreen prs={prs} salvarPRs={salvarPRs}/>,
-};
-const navTabs = [
-{id:“home”,  label:“Início”, icon:“home”},
-{id:“aulas”, label:“Aulas”,  icon:“calendar”},
-{id:“perfil”,label:“Perfil”, icon:“person”},
-];
-
-return (
-<>
-<style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&display=swap'); *{margin:0;padding:0;box-sizing:border-box;} body{background:#040404;} ::-webkit-scrollbar{width:3px;} ::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:4px;} input::placeholder{color:#333;}`}</style>
-
-```
-  <div style={{fontFamily:"'Barlow Condensed',Impact,sans-serif",
-    background:C.bg,color:C.text,minHeight:"100vh",maxWidth:430,margin:"0 auto",position:"relative"}}>
-
-    {banner&&<NotifBanner aula={banner} onDismiss={()=>setBanner(null)}/>}
-
-    {/* Header */}
-    <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,
-      padding:"13px 16px",display:"flex",alignItems:"center",
-      justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <div style={{width:32,height:32,borderRadius:8,
-          background:`linear-gradient(135deg,${C.accentD},${C.accent})`,
-          display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <Icon name="fire" size={18} color="#000"/>
+/* ════════════════════════════════════════════════════
+   INSTALL POPUP
+════════════════════════════════════════════════════ */
+function InstallPopup({onClose,onNever}){
+  const ua=navigator.userAgent,isIOS=/iphone|ipad|ipod/i.test(ua),isAndroid=/android/i.test(ua);
+  const showIOS=isIOS||(!isIOS&&!isAndroid),showAndroid=isAndroid||(!isIOS&&!isAndroid);
+  const Step=({n,text})=><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:22,height:22,borderRadius:"50%",background:C.accent,color:"#000",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n}</div><span style={{fontSize:13,color:C.text,fontWeight:600}}>{text}</span></div>;
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{background:C.surface,borderRadius:"20px 20px 0 0",border:`1px solid ${C.border}`,padding:"20px 20px 40px",width:"100%",maxWidth:430,animation:"slideUp .3s ease"}}>
+        <div style={{width:40,height:4,background:C.border,borderRadius:4,margin:"0 auto 20px"}}/>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
+          <Logo size={52}/>
+          <div><div style={{fontSize:18,fontWeight:900,color:C.accent,letterSpacing:1}}>AMAZONAS</div><div style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:3}}>ALTA PERFORMANCE</div></div>
         </div>
-        <div>
-          <div style={{fontSize:15,fontWeight:900,color:C.accent,letterSpacing:2,lineHeight:1}}>CROSSFIT</div>
-          <div style={{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:3,lineHeight:1}}>AMAZONAS</div>
+        <div style={{fontSize:20,fontWeight:900,marginBottom:6}}>Adicione à tela inicial! 📲</div>
+        <div style={{fontSize:13,color:C.muted,lineHeight:1.6,marginBottom:16}}>Acesse mais rápido e receba lembretes de aulas sem abrir o navegador.</div>
+        <div style={{background:C.subtle,borderRadius:12,padding:14,marginBottom:18}}>
+          {showIOS&&<div style={{marginBottom:showAndroid?12:0}}><div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:C.accent,textTransform:"uppercase",marginBottom:8}}>📱 iPhone / iPad (Safari)</div><Step n="1" text="Toque em Compartilhar na barra do Safari"/><Step n="2" text='"Adicionar à Tela de Início"'/><Step n="3" text='Confirme tocando em "Adicionar"'/>{isIOS&&<p style={{fontSize:11,color:C.muted,marginTop:8,fontWeight:600,lineHeight:1.5}}>⚠️ Notificações só funcionam após adicionar à tela inicial.</p>}</div>}
+          {showIOS&&showAndroid&&<div style={{height:1,background:C.border,margin:"12px 0"}}/>}
+          {showAndroid&&<div><div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:C.accent,textTransform:"uppercase",marginBottom:8}}>🤖 Android (Chrome)</div><Step n="1" text="Toque no menu (⋮) no canto superior direito"/><Step n="2" text='"Adicionar à tela inicial"'/><Step n="3" text="Confirme e pronto!"/></div>}
         </div>
+        <Btn full onClick={onClose}>Entendido!</Btn>
+        <button onClick={onNever} style={{background:"none",border:"none",color:C.muted,fontSize:11,fontWeight:700,cursor:"pointer",width:"100%",marginTop:12,fontFamily:"inherit",letterSpacing:1,textTransform:"uppercase"}}>Não mostrar novamente</button>
       </div>
-      <button onClick={()=>setAdminMode(true)} style={{background:"none",
-        border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",
-        display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}>
-        <Icon name="lock" size={12} color={C.muted}/>
-        <span style={{fontSize:9,fontWeight:700,color:C.muted,fontFamily:"inherit",letterSpacing:1}}>ADMIN</span>
-      </button>
     </div>
+  );
+}
 
-    <div style={{padding:"16px 16px 90px"}}>{screens[tab]}</div>
+/* ── Notif Banner ────────────────────────────────── */
+function NotifBanner({aula,onDismiss}){
+  return<div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,zIndex:500,background:`linear-gradient(90deg,${C.accentD},${C.accent})`,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Icon name="bell" size={18} color="#000"/><div><div style={{fontSize:12,fontWeight:900,color:"#000"}}>🔔 Sua aula começa em 10 min!</div><div style={{fontSize:11,color:"rgba(0,0,0,0.65)",fontWeight:700}}>{aula.hora} · {aula.nome} · Coach {aula.coach}</div></div></div><button onClick={onDismiss} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Icon name="x" size={16} color="#000"/></button></div>;
+}
 
-    {/* Nav */}
-    <div style={{display:"flex",background:C.surface,borderTop:`1px solid ${C.border}`,
-      position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
-      width:"100%",maxWidth:430,zIndex:100}}>
-      {navTabs.map(t=>{
-        const active=tab===t.id;
-        return(
-          <button key={t.id} onClick={()=>setTab(t.id)} style={{
-            flex:1,display:"flex",flexDirection:"column",alignItems:"center",
-            padding:"10px 0 14px",background:"none",border:"none",
-            borderTop:active?`2px solid ${C.accent}`:"2px solid transparent",cursor:"pointer"}}>
-            <Icon name={t.icon} size={20} color={active?C.accent:C.muted}/>
-            <span style={{fontSize:9,fontWeight:700,letterSpacing:1,marginTop:4,
-              color:active?C.accent:C.muted,textTransform:"uppercase",
-              fontFamily:"'Barlow Condensed',sans-serif"}}>{t.label}</span>
-          </button>
-        );
+/* ════════════════════════════════════════════════════
+   TELAS ALUNO
+════════════════════════════════════════════════════ */
+function HomeScreen({user,reservas,setReservas,setTab,notifPerm,onAtivarNotif,prs}){
+  const{checkins,meta,streak}=PERFIL,atingiu=checkins>=meta;
+  const proxima=AULAS.find(a=>reservas.includes(a.id));
+  const diasGrid=Array.from({length:20},(_,i)=>i+1);
+  const presentes=[1,2,4,5,7,9,10,12,13,14,15,16];
+  const nome=(user?.email||"Aluno").split("@")[0].split(".")[0];
+  const nomeFmt=nome.charAt(0).toUpperCase()+nome.slice(1);
+  return(
+    <div style={{animation:"fadeIn .4s ease"}}>
+      <div style={{background:`linear-gradient(135deg,${C.accentD},${C.accent} 70%,#FF9500)`,borderRadius:18,padding:"22px 20px",marginBottom:14,position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",right:-20,top:-20,width:110,height:110,borderRadius:"50%",background:"rgba(255,255,255,0.07)"}}/>
+        <p style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"rgba(0,0,0,0.5)",textTransform:"uppercase",marginBottom:3}}>{new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"short"})}</p>
+        <h1 style={{fontSize:26,fontWeight:900,color:"#000",marginBottom:3,lineHeight:1.1}}>Bom dia, {nomeFmt}! 🔥</h1>
+        <p style={{fontSize:13,color:"rgba(0,0,0,0.55)",fontWeight:600,marginBottom:16}}>{streak} dias seguidos · {PERFIL.plano}</p>
+        <div style={{background:"rgba(0,0,0,0.18)",borderRadius:10,padding:"10px 14px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:11,fontWeight:800,color:"rgba(0,0,0,0.6)",textTransform:"uppercase",letterSpacing:1}}>Check-ins este mês</span><span style={{fontSize:13,fontWeight:900,color:"#000"}}>{checkins}/{meta} {atingiu?"🏆":""}</span></div>
+          <Bar value={checkins} max={meta} color={atingiu?"rgba(0,0,0,0.6)":"rgba(0,0,0,0.4)"}/>
+          <p style={{fontSize:10,color:"rgba(0,0,0,0.5)",fontWeight:700,marginTop:6}}>{atingiu?"✅ Meta atingida! Você está isento pelo resto do mês.":`Faltam ${meta-checkins} check-ins para ficar isento!`}</p>
+        </div>
+      </div>
+      {atingiu&&<div style={{background:C.green+"18",border:`1px solid ${C.green}44`,borderRadius:12,padding:"12px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:20}}>🏆</span><div><div style={{fontSize:13,fontWeight:800,color:C.green}}>Você está isento este mês!</div><div style={{fontSize:11,color:C.muted}}>Atingiu 15 check-ins — sem obrigação nos dias restantes.</div></div></div>}
+      {proxima?(
+        <Card highlight={C.accent}>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.accent,textTransform:"uppercase",marginBottom:10}}>✅ Sua próxima aula</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div><div style={{fontSize:26,fontWeight:900,color:C.accent}}>{proxima.hora}</div><div style={{fontSize:16,fontWeight:800}}>{proxima.nome}</div><div style={{fontSize:12,color:C.muted,marginTop:2}}>Coach {proxima.coach}</div></div>
+            <div style={{background:C.accent+"18",border:`1px solid ${C.accent}33`,borderRadius:10,padding:"10px 12px",textAlign:"center"}}><div style={{fontSize:18}}>🔔</div><div style={{fontSize:9,fontWeight:700,color:C.accent,letterSpacing:.5,marginTop:2}}>LEMBRETE<br/>ATIVO</div></div>
+          </div>
+          <Divider/>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8}}>Não esqueça do check-in no app:</div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>window.open("https://wellhub.com","_blank")} style={{flex:1,background:"#1B4DCC",border:"none",borderRadius:10,padding:"11px 8px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span style={{fontSize:18}}>💪</span><span style={{fontSize:12,fontWeight:800,color:"#fff"}}>Wellhub</span></button>
+            <button onClick={()=>window.open("https://totalpass.com","_blank")} style={{flex:1,background:"#7C3AED",border:"none",borderRadius:10,padding:"11px 8px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span style={{fontSize:18}}>⚡</span><span style={{fontSize:12,fontWeight:800,color:"#fff"}}>Totalpass</span></button>
+          </div>
+          <p style={{fontSize:10,color:C.muted,marginTop:8,textAlign:"center",fontWeight:600}}>Abre o app direto — é só confirmar sua presença no box</p>
+        </Card>
+      ):(
+        <Card><div style={{textAlign:"center",padding:"6px 0"}}><div style={{fontSize:13,color:C.muted,fontWeight:700,marginBottom:10}}>Nenhuma aula reservada para hoje</div><Btn small onClick={()=>setTab("aulas")}>Ver horários →</Btn></div></Card>
+      )}
+      {notifPerm!=="granted"&&<div style={{background:C.subtle,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 14px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Icon name="bell" size={18} color={C.accent}/><div><div style={{fontSize:13,fontWeight:800}}>Ativar lembretes</div><div style={{fontSize:11,color:C.muted}}>Aviso 10 min antes da aula</div></div></div><Btn small onClick={onAtivarNotif}>Ativar</Btn></div>}
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8}}>Meus PRs</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+        {prs.length===0?<div style={{gridColumn:"1/-1",background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:12,textAlign:"center",fontSize:12,color:C.muted}}>Adicione PRs na aba Perfil</div>
+          :prs.map(pr=><div key={pr.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 10px",textAlign:"center"}}><div style={{fontSize:18,fontWeight:900,color:C.accent}}>{pr.peso}</div><div style={{fontSize:9,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pr.exercicio}</div></div>)}
+      </div>
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8}}>Frequência — Este mês</div>
+      <Card><div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>{diasGrid.map(d=><div key={d} style={{aspectRatio:"1",borderRadius:6,background:presentes.includes(d)?C.accent:C.subtle,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:presentes.includes(d)?"#000":C.muted}}>{d}</div>)}</div></Card>
+    </div>
+  );
+}
+
+function AulasScreen({reservas,setReservas}){
+  const hoje=getDia(),diasDisp=hoje?DIAS.slice(DIAS.indexOf(hoje)):DIAS;
+  const [diaIdx,setDiaIdx]=useState(0);
+  const diaSel=diasDisp[diaIdx]||"Seg";
+  const aulasDia=getH(diaSel).map((h,i)=>({id:diaIdx*100+i,hora:h,nome:h<"10:00"?"WOD Matinal":h==="12:00"?"WOD Almoço":"WOD Principal",coach:["Rafael","Camila","Thiago"][i%3],vagas:15,ocupadas:[3,8,12,5,7,10,13,6,4][i]||5}));
+  return(
+    <div style={{animation:"fadeIn .4s ease"}}>
+      <h2 style={{fontSize:26,fontWeight:900,letterSpacing:1,marginBottom:4}}>AULAS</h2>
+      <p style={{fontSize:13,color:C.muted,marginBottom:14}}>Seg–Qui: 9 horários · Sex: 8 · Sáb/Dom: treino especial</p>
+      <div style={{background:`linear-gradient(120deg,${C.accentD},${C.accent})`,borderRadius:14,padding:"16px 18px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div><div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:"rgba(0,0,0,0.5)",textTransform:"uppercase"}}>Convide um amigo</div><div style={{fontSize:18,fontWeight:900,color:"#000",marginTop:2}}>Aula Experimental</div><div style={{fontSize:12,color:"rgba(0,0,0,0.55)",marginTop:3}}>Grátis · Sem compromisso</div></div>
+        <Btn small onClick={()=>alert("Solicitação enviada! O coach confirma em breve.")}>Agendar</Btn>
+      </div>
+      <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:4}}>
+        {diasDisp.map((d,i)=><button key={d} onClick={()=>setDiaIdx(i)} style={{background:i===diaIdx?C.accent:C.subtle,color:i===diaIdx?"#000":C.muted,border:"none",borderRadius:10,padding:"8px 18px",fontWeight:800,fontSize:12,letterSpacing:1,cursor:"pointer",fontFamily:"inherit",textTransform:"uppercase",whiteSpace:"nowrap",flexShrink:0}}>{i===0?"Hoje":d}</button>)}
+      </div>
+      {aulasDia.map(a=>{
+        const cheia=a.ocupadas>=a.vagas,res=reservas.includes(a.id),pct=a.ocupadas/a.vagas,cor=pct>=1?C.red:pct>=.75?C.accent:C.green;
+        return<Card key={a.id} highlight={res?C.accent:null}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}><div><div style={{fontSize:24,fontWeight:900,color:res?C.accent:C.text}}>{a.hora}</div><div style={{fontSize:15,fontWeight:800,marginTop:1}}>{a.nome}</div><div style={{fontSize:12,color:C.muted,marginTop:2}}>Coach {a.coach}</div></div>{res?<Tag color={C.accent}>✓ Reservado</Tag>:cheia?<Tag color={C.red}>Lotado</Tag>:<Tag color={C.green}>Disponível</Tag>}</div>
+          <div style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:10,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>Vagas</span><span style={{fontSize:12,fontWeight:800,color:cor}}>{a.ocupadas}/{a.vagas}</span></div><Bar value={a.ocupadas} max={a.vagas} color={cor} thin/></div>
+          {res?<Btn full variant="ghost" onClick={()=>setReservas(reservas.filter(r=>r!==a.id))}>Cancelar reserva</Btn>:<Btn full disabled={cheia} onClick={()=>!cheia&&setReservas([...reservas,a.id])}>{cheia?"Entrar na lista de espera":"Reservar vaga"}</Btn>}
+        </Card>;
       })}
     </div>
-
-    {showInstall&&(
-      <InstallPopup onClose={fecharInstall} onNever={nuncaMostrar}/>
-    )}
-  </div>
-</>
-```
-
-);
+  );
 }
+
+function PerfilScreen({user,prs,salvarPRs,onLogout}){
+  const{plano,venc,checkins,meta,streak}=PERFIL,atingiu=checkins>=meta;
+  const [showForm,setShowForm]=useState(false),[novoEx,setNovoEx]=useState(""),[novoPeso,setNovoPeso]=useState(""),[editId,setEditId]=useState(null),[logoutLoading,setLogoutLoading]=useState(false);
+  const nome=(user?.email||"Aluno").split("@")[0].split(".")[0],nomeFmt=nome.charAt(0).toUpperCase()+nome.slice(1);
+  const abrirNovo=()=>{setEditId(null);setNovoEx("");setNovoPeso("");setShowForm(true);};
+  const abrirEditar=pr=>{setEditId(pr.id);setNovoEx(pr.exercicio);setNovoPeso(pr.peso);setShowForm(true);};
+  const salvar=()=>{if(!novoEx.trim()||!novoPeso.trim())return;const lista=editId?prs.map(p=>p.id===editId?{...p,exercicio:novoEx.trim(),peso:novoPeso.trim()}:p):[...prs,{id:Date.now(),exercicio:novoEx.trim(),peso:novoPeso.trim()}];salvarPRs(lista);setShowForm(false);setNovoEx("");setNovoPeso("");setEditId(null);};
+  const excluir=id=>salvarPRs(prs.filter(p=>p.id!==id));
+  const handleLogout=async()=>{setLogoutLoading(true);await sb.auth.signOut();onLogout();};
+  const inp={flex:1,background:C.subtle,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px 12px",color:C.text,fontSize:14,fontFamily:"inherit"};
+  const hist=[{data:"07/04",aula:"WOD Principal",hora:"18:30",coach:"Thiago"},{data:"05/04",aula:"WOD Matinal",hora:"05:30",coach:"Rafael"},{data:"04/04",aula:"WOD Almoço",hora:"12:00",coach:"Camila"},{data:"03/04",aula:"WOD Principal",hora:"17:30",coach:"Thiago"},{data:"02/04",aula:"WOD Matinal",hora:"06:30",coach:"Rafael"}];
+  return(
+    <div style={{animation:"fadeIn .4s ease"}}>
+      <div style={{textAlign:"center",padding:"10px 0 22px"}}>
+        <div style={{width:80,height:80,borderRadius:"50%",background:`linear-gradient(135deg,${C.accentD},${C.accent})`,margin:"0 auto 12px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,fontWeight:900,color:"#000"}}>{nomeFmt[0]}</div>
+        <div style={{fontSize:22,fontWeight:900}}>{nomeFmt}</div>
+        <div style={{fontSize:12,color:C.muted,marginTop:2}}>{user?.email}</div>
+        <div style={{fontSize:13,color:C.muted,marginTop:3}}>{plano} · Vence {venc}</div>
+        <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:10,flexWrap:"wrap"}}>
+          <Tag color={C.green}>Ativo</Tag><Tag color={C.accent}>🔥 {streak} dias seguidos</Tag>{atingiu&&<Tag color={C.yellow}>🏆 Isento este mês</Tag>}
+        </div>
+      </div>
+      <Card highlight={atingiu?C.green:null}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><div><div style={{fontSize:14,fontWeight:800}}>Meta de Check-ins</div><div style={{fontSize:11,color:C.muted,marginTop:2}}>{atingiu?"🏆 Meta atingida! Isento pelo resto do mês.":`Faltam ${meta-checkins} para ficar isento`}</div></div><div style={{fontSize:26,fontWeight:900,color:atingiu?C.green:C.accent}}>{checkins}<span style={{fontSize:14,color:C.muted}}>/{meta}</span></div></div>
+        <Bar value={checkins} max={meta} color={atingiu?C.green:C.accent}/>
+        {!atingiu&&<div style={{marginTop:10,background:C.subtle,borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:11,fontWeight:700,color:C.muted,lineHeight:1.5}}>💡 Faça 15 check-ins no mês e fique isento de registrar presença nos dias restantes.</div></div>}
+      </Card>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <Card style={{margin:0,textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:C.accent}}>{checkins}</div><div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1}}>Check-ins</div></Card>
+        <Card style={{margin:0,textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:C.green}}>{streak}</div><div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1}}>Dias Seguidos</div></Card>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase"}}>Recordes Pessoais</div><Btn small onClick={abrirNovo}>+ Novo PR</Btn></div>
+      {showForm&&<Card highlight={C.accent} style={{marginBottom:12}}><div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.accent,textTransform:"uppercase",marginBottom:12}}>{editId?"Editar PR":"Novo PR"}</div><div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}><input value={novoEx} onChange={e=>setNovoEx(e.target.value)} placeholder="Exercício (ex: Snatch...)" style={{...inp,width:"100%",boxSizing:"border-box"}}/><input value={novoPeso} onChange={e=>setNovoPeso(e.target.value)} placeholder="Peso ou marca (ex: 95kg...)" style={{...inp,width:"100%",boxSizing:"border-box"}}/></div><div style={{display:"flex",gap:8}}><Btn full onClick={salvar}>Salvar</Btn><Btn full variant="ghost" onClick={()=>setShowForm(false)}>Cancelar</Btn></div></Card>}
+      {prs.length===0?<Card><div style={{textAlign:"center",padding:"12px 0"}}><div style={{fontSize:24,marginBottom:8}}>🏋️</div><div style={{fontSize:13,color:C.muted,fontWeight:700}}>Nenhum PR registrado ainda</div><div style={{fontSize:11,color:C.muted,marginTop:4}}>Toque em "+ Novo PR" para começar</div></div></Card>
+        :<Card>{prs.map((pr,i)=><div key={pr.id}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}><div style={{fontSize:14,fontWeight:800}}>{pr.exercicio}</div><div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:20,fontWeight:900,color:C.accent}}>{pr.peso}</span><button onClick={()=>abrirEditar(pr)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:10,fontWeight:700,color:C.muted,fontFamily:"inherit"}}>Editar</button><button onClick={()=>excluir(pr.id)} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Icon name="x" size={14} color={C.red}/></button></div></div>{i<prs.length-1&&<Divider/>}</div>)}</Card>}
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8,marginTop:4}}>Histórico Recente</div>
+      {hist.map((h,i)=><div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:12}}><div style={{width:36,height:36,borderRadius:10,background:C.accent+"22",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="check" size={18} color={C.accent}/></div><div><div style={{fontSize:14,fontWeight:800}}>{h.hora} · {h.aula}</div><div style={{fontSize:11,color:C.muted,marginTop:1}}>Coach {h.coach}</div></div></div><span style={{fontSize:11,fontWeight:700,color:C.muted}}>{h.data}</span></div>)}
+      <div style={{marginTop:8,marginBottom:4}}><Btn full variant="ghost" loading={logoutLoading} onClick={handleLogout}>Sair da conta</Btn></div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════
+   ADMIN
+════════════════════════════════════════════════════ */
+function AdminLogin({onLogin}){
+  const[senha,setSenha]=useState(""),[erro,setErro]=useState(false);
+  const tentar=()=>senha==="admin123"?onLogin():(setErro(true),setSenha(""));
+  return<div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}><Logo size={64}/><div style={{fontSize:24,fontWeight:900,letterSpacing:1,marginBottom:4,marginTop:20}}>ÁREA ADMIN</div><div style={{fontSize:13,color:C.muted,marginBottom:30}}>Amazonas Alta Performance</div><div style={{width:"100%",maxWidth:320}}><input type="password" value={senha} onChange={e=>{setSenha(e.target.value);setErro(false);}} onKeyDown={e=>e.key==="Enter"&&tentar()} placeholder="Senha..." style={{width:"100%",background:C.card,border:`2px solid ${erro?C.red:C.border}`,borderRadius:12,padding:"14px 16px",color:C.text,fontSize:16,fontFamily:"inherit",boxSizing:"border-box",marginBottom:8,textAlign:"center",letterSpacing:6}}/>{erro&&<p style={{fontSize:12,color:C.red,fontWeight:700,textAlign:"center",marginBottom:8}}>Senha incorreta</p>}<Btn full onClick={tentar}>Entrar</Btn><p style={{fontSize:10,color:C.muted,textAlign:"center",marginTop:10}}>Demo: admin123</p></div></div>;
+}
+
+function AdminPanel({onSair}){
+  const[aba,setAba]=useState("dashboard"),[pedidos,setPedidos]=useState(ESPERA_INIT),[expandido,setExpandido]=useState(null);
+  const pendentes=pedidos.filter(p=>p.status==="pendente").length,isentos=ADMIN_ALUNOS.filter(a=>a.checkins>=15);
+  const responder=(id,resp)=>setPedidos(pedidos.map(p=>p.id===id?{...p,status:resp}:p));
+  const abas=[{id:"dashboard",label:"Dashboard",icon:"home"},{id:"pedidos",label:"Pedidos",icon:"bell",badge:pendentes},{id:"alunos",label:"Alunos",icon:"users"}];
+  const cards=[{id:"ativos",label:"Ativos",val:ADMIN_ALUNOS.filter(a=>a.status==="ativo").length,color:C.accent,lista:ADMIN_ALUNOS.filter(a=>a.status==="ativo"),icon:"users"},{id:"isentos",label:"Isentos",val:isentos.length,color:C.green,lista:isentos,icon:"star"},{id:"pendentes",label:"Pendentes",val:pendentes,color:C.yellow,lista:[],icon:"bell"},{id:"total",label:"Total",val:ADMIN_ALUNOS.length,color:C.blue,lista:ADMIN_ALUNOS,icon:"users"}];
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,maxWidth:430,margin:"0 auto"}}>
+      <div style={{background:"#0D0D0D",borderBottom:`1px solid ${C.border}`,padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}><Logo size={30}/><div><div style={{fontSize:13,fontWeight:900,color:C.accent,letterSpacing:1,lineHeight:1}}>ADMIN</div><div style={{fontSize:8,fontWeight:700,color:C.muted,letterSpacing:2,lineHeight:1}}>AMAZONAS ALTA PERFORMANCE</div></div></div>
+        <button onClick={onSair} style={{background:C.subtle,border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}><Icon name="arrow" size={14} color={C.muted}/><span style={{fontSize:11,fontWeight:700,color:C.muted,fontFamily:"inherit",letterSpacing:1}}>SAIR</span></button>
+      </div>
+      <div style={{padding:"16px 16px 90px"}}>
+        {aba==="dashboard"&&(
+          <div style={{animation:"fadeIn .4s ease"}}>
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:C.muted,textTransform:"uppercase",marginBottom:12}}>Visão Geral</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+              {cards.map(s=><div key={s.id} onClick={()=>s.lista.length>0&&setExpandido(expandido===s.id?null:s.id)} style={{background:C.card,border:`1px solid ${expandido===s.id?s.color:s.color+"33"}`,borderRadius:14,padding:"16px 14px",cursor:s.lista.length>0?"pointer":"default",transition:"border-color .2s"}}><Icon name={s.icon} size={18} color={s.color}/><div style={{fontSize:28,fontWeight:900,color:s.color,marginTop:8,lineHeight:1}}>{s.val}</div><div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:1,marginTop:4}}>{s.label}</div>{s.lista.length>0&&<div style={{fontSize:9,color:s.color,fontWeight:700,marginTop:4}}>{expandido===s.id?"▲ fechar":"▼ ver lista"}</div>}</div>)}
+            </div>
+            {expandido&&cards.find(c=>c.id===expandido)?.lista.length>0&&(
+              <div style={{marginBottom:14}}>
+                {cards.find(c=>c.id===expandido).lista.map(a=>{const cor=cards.find(c=>c.id===expandido).color;return<div key={a.id} style={{background:C.card,border:`1px solid ${cor}33`,borderRadius:12,padding:"11px 14px",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Avatar nome={a.nome} color={cor} size={32}/><div><div style={{fontWeight:800,fontSize:13}}>{a.nome}</div><div style={{fontSize:10,color:C.muted}}>{a.plano} · Vence {a.venc}</div></div></div><div style={{textAlign:"right"}}><div style={{fontSize:15,fontWeight:900,color:cor}}>{a.checkins}</div><div style={{fontSize:9,color:C.muted,fontWeight:700,textTransform:"uppercase"}}>check-ins</div></div></div>;})}
+              </div>
+            )}
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:C.muted,textTransform:"uppercase",marginBottom:8}}>🏆 Isentos este mês</div>
+            {isentos.length===0?<Card><div style={{fontSize:13,color:C.muted,textAlign:"center",padding:"8px 0"}}>Nenhum aluno atingiu 15 check-ins ainda</div></Card>:isentos.map(a=><div key={a.id} style={{background:C.green+"0F",border:`1px solid ${C.green}33`,borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Avatar nome={a.nome} color={C.green}/><div><div style={{fontWeight:800,fontSize:14}}>{a.nome}</div><div style={{fontSize:11,color:C.muted}}>{a.plano} · Vence {a.venc}</div></div></div><div style={{textAlign:"right"}}><div style={{fontSize:20,fontWeight:900,color:C.green}}>{a.checkins}</div><div style={{fontSize:9,color:C.muted,fontWeight:700,textTransform:"uppercase"}}>check-ins</div></div></div>)}
+          </div>
+        )}
+        {aba==="pedidos"&&(
+          <div style={{animation:"fadeIn .4s ease"}}>
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:C.muted,textTransform:"uppercase",marginBottom:4}}>Solicitações</div>
+            <p style={{fontSize:13,color:C.muted,marginBottom:14}}>Lista de espera e aulas experimentais</p>
+            {pedidos.map(p=>{const cor=p.tipo==="experimental"?C.blue:C.yellow;return<Card key={p.id} highlight={p.status==="pendente"?cor:p.status==="aceito"?C.green:C.red}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}><div style={{display:"flex",alignItems:"center",gap:10}}><Avatar nome={p.nome} color={cor}/><div><div style={{fontWeight:800,fontSize:14}}>{p.nome}</div><div style={{fontSize:11,color:C.muted,marginTop:2}}>{p.aula}</div><div style={{fontSize:10,color:C.muted,marginTop:1}}>Solicitado às {p.hora}</div></div></div><Tag color={p.tipo==="experimental"?C.blue:C.yellow}>{p.tipo==="experimental"?"Experimental":"Espera"}</Tag></div>{p.status==="pendente"?<div style={{display:"flex",gap:8}}><Btn full variant="green" small onClick={()=>responder(p.id,"aceito")}>✓ Aceitar</Btn><Btn full variant="danger" small onClick={()=>responder(p.id,"recusado")}>✗ Recusar</Btn></div>:<div style={{textAlign:"center"}}><Tag color={p.status==="aceito"?C.green:C.red}>{p.status==="aceito"?"✓ Aceito":"✗ Recusado"}</Tag></div>}</Card>;})}
+          </div>
+        )}
+        {aba==="alunos"&&(
+          <div style={{animation:"fadeIn .4s ease"}}>
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:3,color:C.muted,textTransform:"uppercase",marginBottom:14}}>Alunos — Check-ins do mês</div>
+            {[...ADMIN_ALUNOS].sort((a,b)=>b.checkins-a.checkins).map(a=>{const at=a.checkins>=15,cor=a.status==="vencido"?C.red:at?C.green:C.accent;return<Card key={a.id} highlight={at?C.green:a.status==="vencido"?C.red:null}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}><div style={{display:"flex",alignItems:"center",gap:10}}><Avatar nome={a.nome} color={cor}/><div><div style={{fontWeight:800,fontSize:15}}>{a.nome}</div><div style={{fontSize:11,color:C.muted,marginTop:2}}>{a.plano} · Vence {a.venc}</div></div></div><div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}><Tag color={a.status==="ativo"?C.green:C.red}>{a.status}</Tag>{at&&<Tag color={C.green}>🏆 Isento</Tag>}</div></div><div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:10,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>Check-ins</span><span style={{fontSize:13,fontWeight:900,color:cor}}>{a.checkins}/15 {at?"✅":""}</span></div><Bar value={a.checkins} max={15} color={cor} thin/>{at&&<div style={{marginTop:8,background:C.green+"18",border:`1px solid ${C.green}33`,borderRadius:8,padding:"6px 10px"}}><span style={{fontSize:11,color:C.green,fontWeight:700}}>Isento — sem check-in pelo resto do mês</span></div>}</Card>;})}
+          </div>
+        )}
+      </div>
+      <div style={{display:"flex",background:"#0D0D0D",borderTop:`1px solid ${C.border}`,position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,zIndex:100}}>
+        {abas.map(t=>{const active=aba===t.id;return<button key={t.id} onClick={()=>setAba(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 0 14px",background:"none",border:"none",borderTop:active?`2px solid ${C.accent}`:"2px solid transparent",cursor:"pointer",position:"relative"}}><Icon name={t.icon} size={20} color={active?C.accent:C.muted}/>{t.badge>0&&<div style={{position:"absolute",top:6,right:"50%",marginRight:-18,width:16,height:16,borderRadius:"50%",background:C.red,fontSize:9,fontWeight:900,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>{t.badge}</div>}<span style={{fontSize:9,fontWeight:700,letterSpacing:1,marginTop:4,color:active?C.accent:C.muted,textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif"}}>{t.label}</span></button>;})}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════
+   APP ROOT
+════════════════════════════════════════════════════ */
+function App(){
+  const[user,setUser]=useState(null),[authLoading,setAuthLoading]=useState(true);
+  const[tab,setTab]=useState("home"),[reservas,setReservas]=useState([]);
+  const[adminMode,setAdminMode]=useState(false),[adminAuth,setAdminAuth]=useState(false);
+  const[showInstall,setShowInstall]=useState(false),[notifPerm,setNotifPerm]=useState("default");
+  const[banner,setBanner]=useState(null),[prs,setPrs]=useState(PR_DEF);
+  const timerRef=useRef(null);
+
+  useEffect(()=>{
+    sb.auth.getSession().then(({data:{session}})=>{ setUser(session?.user||null); setAuthLoading(false); });
+    const{data:{subscription}}=sb.auth.onAuthStateChange((_,session)=>setUser(session?.user||null));
+    window.addEventListener("beforeinstallprompt",e=>e.preventDefault());
+    return()=>subscription.unsubscribe();
+  },[]);
+
+  useEffect(()=>{
+    if(!user)return;
+    const r=LS.get(`prs_${user.id}`);if(r)setPrs(JSON.parse(r.value));
+    const p=LS.get("install-never-show");if(!p)setShowInstall(true);
+  },[user]);
+
+  useEffect(()=>{
+    const res=AULAS.find(a=>reservas.includes(a.id));
+    if(!res){setBanner(null);return;}
+    if(timerRef.current)clearTimeout(timerRef.current);
+    timerRef.current=setTimeout(()=>setBanner(res),4000);
+    return()=>clearTimeout(timerRef.current);
+  },[reservas]);
+
+  const salvarPRs=lista=>{setPrs(lista);if(user)LS.set(`prs_${user.id}`,JSON.stringify(lista));};
+  const fecharInstall=()=>setShowInstall(false);
+  const nuncaMostrar=()=>{setShowInstall(false);LS.set("install-never-show","1");};
+  const ativarNotif=async()=>{
+    if(!("Notification"in window)){alert("Adicione o app à tela inicial para ativar notificações.");return;}
+    const p=await Notification.requestPermission();setNotifPerm(p);
+    if(p==="granted")new Notification("Amazonas Alta Performance 🔥",{body:"Notificações ativadas!",icon:"/favicon-512x512.png"});
+  };
+
+  if(authLoading)return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:20}}>
+      <Logo size={60}/>
+      <div style={{width:32,height:32,border:`3px solid ${C.border}`,borderTopColor:C.accent,borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+    </div>
+  );
+
+  if(!user)return <LoginScreen onLogin={setUser}/>;
+  if(adminMode){
+    if(!adminAuth)return <AdminLogin onLogin={()=>setAdminAuth(true)}/>;
+    return <AdminPanel onSair={()=>{setAdminMode(false);setAdminAuth(false);}}/>;
+  }
+
+  const navTabs=[{id:"home",label:"Início",icon:"home"},{id:"aulas",label:"Aulas",icon:"calendar"},{id:"perfil",label:"Perfil",icon:"person"}];
+  const screens={
+    home:<HomeScreen user={user} reservas={reservas} setReservas={setReservas} setTab={setTab} notifPerm={notifPerm} onAtivarNotif={ativarNotif} prs={prs}/>,
+    aulas:<AulasScreen reservas={reservas} setReservas={setReservas}/>,
+    perfil:<PerfilScreen user={user} prs={prs} salvarPRs={salvarPRs} onLogout={()=>{setUser(null);setTab("home");}}/>,
+  };
+
+  return(
+    <div style={{fontFamily:"'Barlow Condensed',Impact,sans-serif",background:C.bg,color:C.text,minHeight:"100vh",maxWidth:430,margin:"0 auto",position:"relative"}}>
+      <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}} @keyframes spin{to{transform:rotate(360deg)}} @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+      {banner&&<NotifBanner aula={banner} onDismiss={()=>setBanner(null)}/>}
+      <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"13px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <Logo size={32}/>
+          <div><div style={{fontSize:14,fontWeight:900,color:C.accent,letterSpacing:2,lineHeight:1}}>AMAZONAS</div><div style={{fontSize:8,fontWeight:700,color:C.muted,letterSpacing:2,lineHeight:1}}>ALTA PERFORMANCE</div></div>
+        </div>
+        <button onClick={()=>setAdminMode(true)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}><Icon name="lock" size={12} color={C.muted}/><span style={{fontSize:9,fontWeight:700,color:C.muted,fontFamily:"inherit",letterSpacing:1}}>ADMIN</span></button>
+      </div>
+      <div style={{padding:"16px 16px 90px"}}>{screens[tab]}</div>
+      <div style={{display:"flex",background:C.surface,borderTop:`1px solid ${C.border}`,position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,zIndex:100}}>
+        {navTabs.map(t=>{const active=tab===t.id;return<button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 0 14px",background:"none",border:"none",borderTop:active?`2px solid ${C.accent}`:"2px solid transparent",cursor:"pointer"}}><Icon name={t.icon} size={20} color={active?C.accent:C.muted}/><span style={{fontSize:9,fontWeight:700,letterSpacing:1,marginTop:4,color:active?C.accent:C.muted,textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif"}}>{t.label}</span></button>;})}
+      </div>
+      {showInstall&&<InstallPopup onClose={fecharInstall} onNever={nuncaMostrar}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
